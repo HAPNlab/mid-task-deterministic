@@ -87,7 +87,8 @@ This project is forked from [`mid-task`](../mid-task) at the `next` branch. Key 
 | `TARGET_DUR_S` | `{low: 0.150, medium: 0.265, high: 0.400}` | Fixed target duration per difficulty |
 | `INITIAL_FIX_DUR_S` | `12.0` | Initial fixation before first trial |
 | `CLOSING_FIX_DUR_S` | `8.0` | Closing fixation after last trial |
-| `JITTER_MAX_S` | `0.05` | Max uniform jitter before target onset |
+| `JITTER_MIN_S` | `0.25` | Min pre-target jitter before target onset |
+| `JITTER_MAX_S` | `1.0` | Max pre-target jitter before target onset |
 | `SCANNER_PULSE_RATE` | `46` | Hardware pulses per TR from MCC counter |
 
 ## Scanner Synchronisation
@@ -116,3 +117,7 @@ Sequences live in `sequences/` as CSV files with columns:
 | `magnitude` | `0`, `1`, `5` |
 | `difficulty` | `low`, `medium`, `high` |
 | `n_iti` | Number of ITI TRs (1 or 2) for pseudorandom spacing |
+
+Additional implementation choices kept intentionally:
+- Early-press checking starts during fixation and continues until target onset.
+- Response keys accept `1`-`10`.

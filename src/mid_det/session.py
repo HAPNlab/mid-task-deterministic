@@ -26,6 +26,7 @@ class SessionInfo:
     fmri: bool
     run_n: str                 # "1" | "2" | "practice"
     show_instructions: bool
+    base_rt_s: float
 
 
 def show_dialog() -> SessionInfo:
@@ -35,16 +36,28 @@ def show_dialog() -> SessionInfo:
         "fMRI? (yes/no)": "no",
         "Task number (1/2/practice)": "practice",
         "Show instructions? (yes/no)": "yes",
+        "Baseline RT (ms; blank=default)": "",
     }
     dlg = gui.DlgFromDict(dictionary=fields, title="MID Task (Deterministic)")
     if not dlg.OK:
         core.quit()
 
+    run_n = str(fields["Task number (1/2/practice)"]).strip()
+    base_rt_ms_raw = str(fields["Baseline RT (ms; blank=default)"]).strip()
+    if base_rt_ms_raw:
+        base_rt_ms = float(base_rt_ms_raw)
+    else:
+        default_s = (
+            config.BASE_RT_PRACTICE_S if run_n == "practice" else config.BASE_RT_S
+        )
+        base_rt_ms = default_s * 1000.0
+
     return SessionInfo(
         subject_id=str(fields["Subject ID"]),
         fmri=fields["fMRI? (yes/no)"].strip().lower() == "yes",
-        run_n=str(fields["Task number (1/2/practice)"]).strip(),
+        run_n=run_n,
         show_instructions=fields["Show instructions? (yes/no)"].strip().lower() == "yes",
+        base_rt_s=base_rt_ms / 1000.0,
     )
 
 
@@ -82,13 +95,12 @@ def load_sequence(run_n: str) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Sequence file not found: {path}")
     df = pd.read_csv(path)
-    required = {"valence", "magnitude", "difficulty", "n_iti"}
+    required = {"valence", "magnitude", "n_iti"}
     if not required.issubset(df.columns):
         raise ValueError(f"Sequence file must have columns {required}; got {set(df.columns)}")
     df["magnitude"] = df["magnitude"].astype(int)
     df["n_iti"] = df["n_iti"].astype(int)
     df["valence"] = df["valence"].astype(str)
-    df["difficulty"] = df["difficulty"].astype(str)
 
     # Validate values
     for i, row in df.iterrows():
@@ -96,8 +108,6 @@ def load_sequence(run_n: str) -> pd.DataFrame:
             raise ValueError(f"row {i}: valence '{row['valence']}' not in {config.VALENCES}")
         if int(row["magnitude"]) not in config.MAGNITUDES:
             raise ValueError(f"row {i}: magnitude '{row['magnitude']}' not in {config.MAGNITUDES}")
-        if row["difficulty"] not in config.DIFFICULTIES:
-            raise ValueError(f"row {i}: difficulty '{row['difficulty']}' not in {config.DIFFICULTIES}")
 
     return df.reset_index(drop=True)
 

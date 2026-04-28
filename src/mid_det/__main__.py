@@ -21,6 +21,7 @@ def run() -> None:
     import rich.box
 
     from mid_det import config, display, recorder, scanner, session, trial
+    from mid_det.calibration import CalibrationState
 
     # ── INITIALISE SESSION ───────────────────────────────────────────────────
     session_info = session.show_dialog()
@@ -55,20 +56,18 @@ def run() -> None:
     sequence = session.load_sequence(session_info.run_n)
     n_trials = len(sequence)
 
-    # ── TARGET DURATIONS (FIXED) ────────────────────────────────────────────
+    # ── ADAPTIVE CALIBRATION ────────────────────────────────────────────────
+    base_rt_s = session_info.base_rt_s
+    calibration = CalibrationState(base_rt_s=base_rt_s)
     rcon.print(
-        "[bold]Target duration (fixed):[/bold] "
-        + "  ".join(
-            f"{d}=[cyan]{int(config.TARGET_DUR_S[d] * 1000)} ms[/cyan]"
-            for d in config.DIFFICULTIES
-        )
+        f"[bold]Adaptive target window:[/bold] base=[cyan]{int(base_rt_s * 1000)} ms[/cyan]  "
+        f"step=±[cyan]{int(config.RT_CHANGE_S * 1000)} ms[/cyan]  "
+        f"win-ratio threshold=[cyan]{config.WIN_RATIO_THRESHOLD}[/cyan]"
     )
     logging.exp(
-        "Target duration (fixed): "
-        + "  ".join(
-            f"{d}={int(config.TARGET_DUR_S[d] * 1000)} ms"
-            for d in config.DIFFICULTIES
-        )
+        f"Adaptive target window: base={int(base_rt_s * 1000)} ms  "
+        f"step=±{int(config.RT_CHANGE_S * 1000)} ms  "
+        f"win-ratio threshold={config.WIN_RATIO_THRESHOLD}"
     )
 
     # ── SETUP OUTPUT FILES ───────────────────────────────────────────────────
@@ -133,8 +132,7 @@ def run() -> None:
     table = Table(box=rich.box.SIMPLE_HEAD)
     table.add_column("#", justify="right")
     table.add_column("Cue")
-    table.add_column("Diff")
-    table.add_column("Dur", justify="right")
+    table.add_column("Window", justify="right")
     table.add_column("Result")
     table.add_column("RT", justify="right")
     table.add_column("Outcome", justify="right")
@@ -160,6 +158,7 @@ def run() -> None:
                 run_n=session_info.run_n,
                 pulse_ct=pulse_ct,
                 pulse_counter=pulse_counter,
+                calibration=calibration,
             )
 
             if scan_phases:
@@ -180,7 +179,6 @@ def run() -> None:
             table.add_row(
                 f"{trial_n}/{n_trials}",
                 rec.cue_label,
-                rec.difficulty,
                 f"{rec.target_dur_ms} ms",
                 result_cell,
                 rt_str,
@@ -191,8 +189,8 @@ def run() -> None:
             live.refresh()
 
             logging.exp(
-                f"Trial {trial_n:3d}/{n_trials}  {rec.cue_label:<5}  diff={rec.difficulty:<6}  "
-                f"dur={rec.target_dur_ms:3d} ms  {result_label:<5}  RT={rt_str:>6}  "
+                f"Trial {trial_n:3d}/{n_trials}  {rec.cue_label:<5}  "
+                f"win={rec.target_dur_ms:3d} ms  {result_label:<5}  RT={rt_str:>6}  "
                 f"outcome={rec.reward_outcome:>4}  total={f'${rec.total_earned}':>5}  "
                 f"hit_rate={hit_rate:3.0f}%"
             )

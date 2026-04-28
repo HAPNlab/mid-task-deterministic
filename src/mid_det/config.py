@@ -20,28 +20,37 @@ VALENCE_SIGN: dict[str, int] = {"gain": +1, "loss": -1}
 # Magnitude tiers (absolute dollar amounts)
 MAGNITUDES: list[int] = [0, 1, 5]
 
-# Difficulty levels and their FIXED target display durations (seconds).
-# Replaces the QUEST staircase used in mid-task: target duration depends only
-# on the trial's difficulty label, never on prior performance.
-DIFFICULTIES: list[str] = ["low", "medium", "high"]
-TARGET_DUR_S: dict[str, float] = {
-    "low":    0.150,   # short  → harder
-    "medium": 0.265,   # medium
-    "high":   0.400,   # long   → easier
+# Trial type lookup: 6 cue types, matching MATLAB mid-task `var.cues` indexing.
+# 1 = low square (-$0), 2 = mid square (-$1), 3 = high square (-$5),
+# 4 = low circle (+$0), 5 = mid circle (+$1), 6 = high circle (+$5).
+TRIAL_TYPE_MAP: dict[tuple[str, int], int] = {
+    ("loss", 0): 1,
+    ("loss", 1): 2,
+    ("loss", 5): 3,
+    ("gain", 0): 4,
+    ("gain", 1): 5,
+    ("gain", 5): 6,
 }
 
-# Trial type lookup: (valence, magnitude, difficulty) -> integer 1-18
-TRIAL_TYPE_MAP: dict[tuple[str, int, str], int] = {
-    (valence, mag, diff): idx + 1
-    for idx, (valence, mag, diff) in enumerate(
-        (v, m, d) for v in VALENCES for m in MAGNITUDES for d in DIFFICULTIES
-    )
-}
+# Adaptive target-window staircase (per-cue), matching MATLAB PresentTarget.m.
+# Target duration starts at BASE_RT_S for each cue type and adjusts by
+# RT_CHANGE_S each trial once the cue has at least MIN_TRIALS_FOR_ADAPT prior
+# trials: cumulative win-ratio > WIN_RATIO_THRESHOLD shrinks the window
+# (harder), otherwise grows it (easier).
+BASE_RT_S: float = 0.265
+BASE_RT_PRACTICE_S: float = 0.400
+RT_CHANGE_S: float = 0.020
+WIN_RATIO_THRESHOLD: float = 0.66
+MIN_TRIALS_FOR_ADAPT: int = 3
 
 # Run structure
 INITIAL_FIX_DUR_S: float = 12.0
 CLOSING_FIX_DUR_S: float = 8.0
-JITTER_MAX_S: float = 0.05
+
+# Pre-target jitter from response-phase onset to target onset.
+# Matches MATLAB front-buffer timing: 0.25 + rand()*0.75 seconds.
+JITTER_MIN_S: float = 0.25
+JITTER_MAX_S: float = 1.0
 
 # Scanner settings
 SCANNER_PULSE_RATE: int = 46

@@ -12,6 +12,7 @@ from psychopy import core, event as psy_event, logging, visual
 from psychopy.hardware import keyboard
 
 from mid_det import config
+from mid_det.calibration import CalibrationState
 from mid_det.display import Stimuli, draw_cue, draw_feedback, draw_fixation, draw_target
 from mid_det.recorder import ScanPhase, TrialRecord
 from mid_det.scanner import PulseCounter
@@ -84,6 +85,8 @@ def run_response(
 
         if target_shown and not target_removed:
             draw_target(stimuli)
+        elif not target_shown:
+            draw_fixation(stimuli)
         win.flip()
 
         if not target_shown and not early_press:
@@ -114,15 +117,16 @@ def _compute_reward(
     if valence == "gain":
         if hit and magnitude > 0:
             return f"+${magnitude}", total_earned + magnitude
-        if hit:
-            return "$0", total_earned
+        if hit and magnitude == 0:
+            return "+$0", total_earned
         return "$0", total_earned
+
     # loss
     if hit:
         return "$0", total_earned
     if magnitude > 0:
         return f"-${magnitude}", total_earned - magnitude
-    return "$0", total_earned
+    return "-$0", total_earned
 
 
 def run_outcome(
@@ -180,6 +184,7 @@ def run_trial(
     run_n: str,
     pulse_ct: int,
     pulse_counter: PulseCounter,
+    calibration: CalibrationState,
 ) -> tuple[TrialRecord, list[ScanPhase], float, int]:
     """
     Run one complete trial (cue → fixation → response → outcome → ITI).
@@ -188,16 +193,18 @@ def run_trial(
     """
     valence = str(row["valence"])
     magnitude = int(row["magnitude"])
-    difficulty = str(row["difficulty"])
-    trial_type = config.TRIAL_TYPE_MAP[(valence, magnitude, difficulty)]
-    target_dur_s = config.TARGET_DUR_S[difficulty]
-    jitter_s = random.uniform(0, config.JITTER_MAX_S)
+    trial_type = config.TRIAL_TYPE_MAP[(valence, magnitude)]
+    target_dur_s = calibration.next_target_dur_s(valence, magnitude)
+    jitter_s = random.uniform(
+        config.JITTER_MIN_S,
+        config.JITTER_MAX_S,
+    )
     label = config.cue_label(valence, magnitude)
 
     target_dur_ms = int(round(target_dur_s * 1000))
     logging.exp(
-        f"  -> cue={label}  difficulty={difficulty}  "
-        f"target_dur={target_dur_ms} ms  jitter={int(jitter_s * 1000)} ms"
+        f"  -> cue={label}  target_dur={target_dur_ms} ms  "
+        f"jitter={int(jitter_s * 1000)} ms"
     )
 
     scan_phases: list[ScanPhase] = []
@@ -258,6 +265,7 @@ def run_trial(
         win, stimuli, kb, hit, valence, magnitude, total_earned
     )
     nominal_time += config.STUDY_TIMES_S["outcome"]
+    calibration.record_outcome(valence, magnitude, bool(hit))
 
     # ── ITI ──────────────────────────────────────────────────────────────────
     for _ in range(n_iti_trs):
@@ -284,7 +292,6 @@ def run_trial(
         trial_type=trial_type,
         valence=valence,
         magnitude=magnitude,
-        difficulty=difficulty,
         cue_label=label,
         time_onset=round(time_onset, 6),
         jitter_ms=int(round(jitter_s * 1000)),

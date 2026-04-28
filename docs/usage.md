@@ -49,7 +49,7 @@ uv run mid-task-det
 | `4` | Navigate instructions forward |
 | `3` | Navigate instructions backward |
 | `0` | Start task / advance past instructions finish screen |
-| `1`–`9` | Response button during target |
+| `1`–`10` | Response button during target |
 | `Escape` or `l` | Quit at any time |
 
 ### fMRI Mode
@@ -59,7 +59,7 @@ uv run mid-task-det
 | `7` | Navigate instructions forward |
 | `6` | Navigate instructions backward |
 | `0` | Advance past instructions finish screen |
-| `1`–`9` | Response button during target |
+| `1`–`10` | Response button during target |
 | `Escape` or `l` | Quit at any time |
 
 ## Trial Structure
@@ -74,12 +74,15 @@ Six cues from a 2 × 3 design (valence × magnitude):
 
 | Cue | Shape | Line position | Hit outcome | Miss outcome |
 |-----|-------|---------------|-------------|--------------|
-| `+$0` | Circle | bottom | $0 | $0 |
+| `+$0` | Circle | bottom | +$0 | $0 |
 | `+$1` | Circle | middle | +$1 | $0 |
 | `+$5` | Circle | top | +$5 | $0 |
-| `-$0` | Square | bottom | $0 | $0 |
+| `-$0` | Square | bottom | $0 | -$0 |
 | `-$1` | Square | middle | $0 | -$1 |
 | `-$5` | Square | top | $0 | -$5 |
+
+During the response phase, target onset is delayed by a random pre-target jitter
+uniformly sampled from **250–1000 ms**.
 
 ### Fixed Target Duration per Difficulty
 
@@ -97,6 +100,12 @@ Values are defined in `src/mid_det/config.py` (`TARGET_DUR_S`).
 2. **Trial loop** – 54 trials (practice: 18 trials)
 3. **Closing fixation** – 8 s crosshair after the last trial
 4. **End screen** – Press `0` to exit
+
+`early_press` is set when a response key is pressed any time from fixation onset
+through target onset (fixation-window checking is intentional).
+
+ITI duration is sequence-driven as `n_iti` TR units (each unit = 2 s), yielding
+2 s or 4 s ITIs in the shipped sequences.
 
 ## Output Files
 

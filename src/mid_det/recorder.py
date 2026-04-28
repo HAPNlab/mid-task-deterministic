@@ -20,7 +20,6 @@ class TrialRecord:
     trial_type: int
     valence: str
     magnitude: int
-    difficulty: str
     cue_label: str
     time_onset: float
     jitter_ms: int
@@ -51,7 +50,7 @@ class ScanPhase:
 
 
 BEHAVIORAL_COLUMNS: list[str] = [
-    "trial_n", "trial_type", "valence", "magnitude", "difficulty", "cue_label",
+    "trial_n", "trial_type", "valence", "magnitude", "cue_label",
     "time_onset", "jitter_ms", "target_dur_ms", "early_press", "hit", "rt_ms",
     "reward_outcome", "total_earned", "time_trial_end", "trial_dur_ms",
     "time_sched_end", "timing_drift_ms", "total_trs", "subject_id", "run_n",
@@ -107,7 +106,10 @@ def write_manifest(
         MR_SETTINGS,
         INITIAL_FIX_DUR_S,
         CLOSING_FIX_DUR_S,
-        TARGET_DUR_S,
+        RT_CHANGE_S,
+        WIN_RATIO_THRESHOLD,
+        MIN_TRIALS_FOR_ADAPT,
+        JITTER_MIN_S,
         JITTER_MAX_S,
     )
 
@@ -124,7 +126,11 @@ def write_manifest(
             "tr_duration_s": MR_SETTINGS["TR"],
             "initial_fix_dur_s": INITIAL_FIX_DUR_S,
             "closing_fix_dur_s": CLOSING_FIX_DUR_S,
-            "target_dur_s": TARGET_DUR_S,
+            "base_rt_s": session_info.base_rt_s,
+            "rt_change_s": RT_CHANGE_S,
+            "win_ratio_threshold": WIN_RATIO_THRESHOLD,
+            "min_trials_for_adapt": MIN_TRIALS_FOR_ADAPT,
+            "jitter_min_s": JITTER_MIN_S,
             "jitter_max_s": JITTER_MAX_S,
         },
     }
