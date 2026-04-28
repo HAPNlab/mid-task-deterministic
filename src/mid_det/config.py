@@ -43,9 +43,12 @@ RT_CHANGE_S: float = 0.020
 WIN_RATIO_THRESHOLD: float = 0.66
 MIN_TRIALS_FOR_ADAPT: int = 3
 
-# Run structure
+# Run structure (matches MATLAB var.leadin / var.leadout for scanned blocks).
 INITIAL_FIX_DUR_S: float = 12.0
 CLOSING_FIX_DUR_S: float = 8.0
+# Practice block uses shortened leadin/leadout (MATLAB main.m lines 154-155).
+PRACTICE_INITIAL_FIX_DUR_S: float = 2.0
+PRACTICE_CLOSING_FIX_DUR_S: float = 0.0
 
 # Pre-target jitter from response-phase onset to target onset.
 # Matches MATLAB front-buffer timing: 0.25 + rand()*0.75 seconds.
@@ -72,4 +75,4 @@ EXP_KEYS: list[str] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 def cue_label(valence: str, magnitude: int) -> str:
     """Return the on-screen dollar label for a (valence, magnitude) cue."""
     sign = "+" if VALENCE_SIGN[valence] > 0 else "-"
-    return f"{sign}${magnitude}"
+    return f"{sign}${magnitude}.00"

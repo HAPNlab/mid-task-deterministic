@@ -6,6 +6,7 @@ No rendering objects are built here; no data is written here.
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 
 import pandas as pd
 from psychopy import core, event as psy_event, logging, visual
@@ -13,7 +14,14 @@ from psychopy.hardware import keyboard
 
 from mid_det import config
 from mid_det.calibration import CalibrationState
-from mid_det.display import Stimuli, draw_cue, draw_feedback, draw_fixation, draw_target
+from mid_det.display import (
+    Stimuli,
+    draw_cue,
+    draw_feedback,
+    draw_fixation_o,
+    draw_fixation_x,
+    draw_target,
+)
 from mid_det.recorder import ScanPhase, TrialRecord
 from mid_det.scanner import PulseCounter
 
@@ -42,7 +50,7 @@ def run_fixation(
     psy_event.clearEvents()
     timer = core.CountdownTimer(config.STUDY_TIMES_S["fixation"])
     while timer.getTime() > 0:
-        draw_fixation(stimuli)
+        draw_fixation_x(stimuli)
         win.flip()
         _check_quit(kb)
     keys = psy_event.getKeys(keyList=config.EXP_KEYS)
@@ -86,7 +94,7 @@ def run_response(
         if target_shown and not target_removed:
             draw_target(stimuli)
         elif not target_shown:
-            draw_fixation(stimuli)
+            draw_fixation_x(stimuli)
         win.flip()
 
         if not target_shown and not early_press:
@@ -116,17 +124,17 @@ def _compute_reward(
     """
     if valence == "gain":
         if hit and magnitude > 0:
-            return f"+${magnitude}", total_earned + magnitude
+            return f"+${magnitude}.00", total_earned + magnitude
         if hit and magnitude == 0:
-            return "+$0", total_earned
-        return "$0", total_earned
+            return "+$0.00", total_earned
+        return "$0.00", total_earned
 
     # loss
     if hit:
-        return "$0", total_earned
+        return "$0.00", total_earned
     if magnitude > 0:
-        return f"-${magnitude}", total_earned - magnitude
-    return "-$0", total_earned
+        return f"-${magnitude}.00", total_earned - magnitude
+    return "-$0.00", total_earned
 
 
 def run_outcome(
@@ -159,7 +167,7 @@ def run_iti(
         return
     timer = core.CountdownTimer(fix_dur_s)
     while timer.getTime() > 0:
-        draw_fixation(stimuli)
+        draw_fixation_o(stimuli)
         win.flip()
         _check_quit(kb)
 
@@ -185,6 +193,8 @@ def run_trial(
     pulse_ct: int,
     pulse_counter: PulseCounter,
     calibration: CalibrationState,
+    on_response: Callable[[bool, float | None, bool, int], None] | None = None,
+    on_outcome: Callable[[str, int, bool], None] | None = None,
 ) -> tuple[TrialRecord, list[ScanPhase], float, int]:
     """
     Run one complete trial (cue → fixation → response → outcome → ITI).
@@ -250,6 +260,8 @@ def run_trial(
         win, stimuli, kb, jitter_s, target_dur_s, early_press
     )
     nominal_time += config.STUDY_TIMES_S["response"]
+    if on_response is not None:
+        on_response(hit, rt_s, early_press, target_dur_ms)
 
     # ── OUTCOME ──────────────────────────────────────────────────────────────
     pulse_ct += pulse_counter.wait_for_tr()
@@ -266,6 +278,8 @@ def run_trial(
     )
     nominal_time += config.STUDY_TIMES_S["outcome"]
     calibration.record_outcome(valence, magnitude, bool(hit))
+    if on_outcome is not None:
+        on_outcome(reward_outcome, total_earned, hit)
 
     # ── ITI ──────────────────────────────────────────────────────────────────
     for _ in range(n_iti_trs):

@@ -4,25 +4,23 @@ Wires all modules together.
 """
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
+
+# Must be set before any other PsychoPy import (prevents macOS pyglet crash).
+from psychopy import core
+core.checkPygletDuringWait = False
+
+from psychopy import event as psy_event, logging
+from psychopy.hardware import keyboard
+from rich.console import Console
+
+from mid_det import config, display, recorder, scanner, session, trial
+from mid_det.calibration import CalibrationState
+from mid_det.console import TrialLiveView
+
 
 def run() -> None:
-    # Disable pyglet event checking in background threads (prevents macOS crash)
-    from psychopy import core
-    core.checkPygletDuringWait = False
-
-    from datetime import datetime
-    from pathlib import Path
-
-    from psychopy import event as psy_event, logging
-    from psychopy.hardware import keyboard
-    from rich.console import Console
-    from rich.live import Live
-    from rich.table import Table
-    import rich.box
-
-    from mid_det import config, display, recorder, scanner, session, trial
-    from mid_det.calibration import CalibrationState
-
     # ── INITIALISE SESSION ───────────────────────────────────────────────────
     session_info = session.show_dialog()
     session_time = datetime.now()
@@ -116,9 +114,13 @@ def run() -> None:
     global_clock = core.Clock()
     global_clock.reset()
 
-    t_fix_end = config.INITIAL_FIX_DUR_S
+    is_practice = session_info.run_n == "practice"
+    leadin_s = config.PRACTICE_INITIAL_FIX_DUR_S if is_practice else config.INITIAL_FIX_DUR_S
+    leadout_s = config.PRACTICE_CLOSING_FIX_DUR_S if is_practice else config.CLOSING_FIX_DUR_S
+
+    t_fix_end = leadin_s
     while global_clock.getTime() < t_fix_end:
-        stimuli_obj.fix.draw()
+        stimuli_obj.fix_o.draw()
         win.flip()
 
     nominal_time = global_clock.getTime()
@@ -129,20 +131,13 @@ def run() -> None:
     n_hits = 0
     n_trials_done = 0
 
-    table = Table(box=rich.box.SIMPLE_HEAD)
-    table.add_column("#", justify="right")
-    table.add_column("Cue")
-    table.add_column("Window", justify="right")
-    table.add_column("Result")
-    table.add_column("RT", justify="right")
-    table.add_column("Outcome", justify="right")
-    table.add_column("Total", justify="right")
-    table.add_column("Hit %", justify="right")
-
-    with Live(table, console=rcon, auto_refresh=False) as live:
+    with TrialLiveView(rcon, n_trials) as view:
         for trial_idx, row in sequence.iterrows():
             trial_n = int(trial_idx) + 1
             n_iti = int(row["n_iti"])
+            cue_lbl = config.cue_label(str(row["valence"]), int(row["magnitude"]))
+
+            view.start_trial(trial_n, cue_lbl, n_hits, n_trials_done)
 
             rec, scan_phases, nominal_time, total_earned = trial.run_trial(
                 win=win,
@@ -159,6 +154,8 @@ def run() -> None:
                 pulse_ct=pulse_ct,
                 pulse_counter=pulse_counter,
                 calibration=calibration,
+                on_response=view.on_response,
+                on_outcome=view.on_outcome,
             )
 
             if scan_phases:
@@ -169,24 +166,6 @@ def run() -> None:
             hit_rate = n_hits / n_trials_done * 100
             rt_str = f"{rec.rt_ms:.0f} ms" if rec.rt_ms != "" else "—"
             result_label = "HIT" if rec.hit else ("early" if rec.early_press else "miss")
-            if rec.hit:
-                result_cell = "[green]HIT[/green]"
-            elif rec.early_press:
-                result_cell = "[yellow]early[/yellow]"
-            else:
-                result_cell = "[red]miss[/red]"
-
-            table.add_row(
-                f"{trial_n}/{n_trials}",
-                rec.cue_label,
-                f"{rec.target_dur_ms} ms",
-                result_cell,
-                rt_str,
-                rec.reward_outcome,
-                f"${rec.total_earned}",
-                f"{hit_rate:.0f}%",
-            )
-            live.refresh()
 
             logging.exp(
                 f"Trial {trial_n:3d}/{n_trials}  {rec.cue_label:<5}  "
@@ -211,8 +190,8 @@ def run() -> None:
 
     # ── CLOSING FIXATION ─────────────────────────────────────────────────────
     t_close_start = global_clock.getTime()
-    while global_clock.getTime() < t_close_start + config.CLOSING_FIX_DUR_S:
-        stimuli_obj.fix.draw()
+    while global_clock.getTime() < t_close_start + leadout_s:
+        stimuli_obj.fix_o.draw()
         win.flip()
 
     # ── END SCREEN ───────────────────────────────────────────────────────────

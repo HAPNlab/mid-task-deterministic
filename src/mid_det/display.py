@@ -24,14 +24,14 @@ _LINE_Y_FRAC: dict[int, float] = {0: -0.707, 1: 0.0, 5: +0.707}
 @dataclass
 class Stimuli:
     win: visual.Window
-    fix: visual.TextStim
+    fix_x: visual.TextStim
+    fix_o: visual.TextStim
     cue_circle: visual.Circle
     cue_square: visual.Rect
     cue_line: visual.Line
     cue_label: visual.TextStim
     target: visual.Polygon
-    feedback_trial: visual.TextStim
-    feedback_exp: visual.TextStim
+    feedback_amount: visual.TextStim
     instr_prompt: visual.TextStim
     instr_first: visual.TextStim
     instr_move: visual.TextStim
@@ -47,12 +47,16 @@ def build_stimuli(win: visual.Window) -> Stimuli:
     x_scr = float(win_res[0]) / float(win_res[1])
     font_h = y_scr / 25
     wrap_w = x_scr / 1.5
-    text_col = "black"
+    text_col = "white"
 
     cue_radius = 0.2
 
-    fix = visual.TextStim(
-        win, name="fix", pos=(0, 0), text="+", height=font_h * 2, color=text_col,
+    fix_x = visual.TextStim(
+        win, name="fix_x", pos=(0, 0), text="x", height=font_h * 2, color=text_col,
+        autoLog=False,
+    )
+    fix_o = visual.TextStim(
+        win, name="fix_o", pos=(0, 0), text="o", height=font_h * 2, color=text_col,
         autoLog=False,
     )
 
@@ -87,14 +91,9 @@ def build_stimuli(win: visual.Window) -> Stimuli:
         autoLog=False,
     )
 
-    feedback_trial = visual.TextStim(
-        win, name="feedback_trial", font="Arial", pos=(0, -y_scr / 20),
+    feedback_amount = visual.TextStim(
+        win, name="feedback_amount", font="Arial", pos=(0, 0),
         height=font_h + y_scr / 30, wrapWidth=None, color=text_col,
-        autoLog=False,
-    )
-    feedback_exp = visual.TextStim(
-        win, name="feedback_exp", font="Arial", pos=(0, y_scr / 6),
-        height=font_h + y_scr / 30, wrapWidth=None, color="Green",
         autoLog=False,
     )
 
@@ -139,14 +138,14 @@ def build_stimuli(win: visual.Window) -> Stimuli:
 
     return Stimuli(
         win=win,
-        fix=fix,
+        fix_x=fix_x,
+        fix_o=fix_o,
         cue_circle=cue_circle,
         cue_square=cue_square,
         cue_line=cue_line,
         cue_label=cue_label,
         target=target,
-        feedback_trial=feedback_trial,
-        feedback_exp=feedback_exp,
+        feedback_amount=feedback_amount,
         instr_prompt=instr_prompt,
         instr_first=instr_first,
         instr_move=instr_move,
@@ -193,8 +192,14 @@ def draw_cue(stimuli: Stimuli, valence: str, magnitude: int) -> None:
     stimuli.cue_label.draw()
 
 
-def draw_fixation(stimuli: Stimuli) -> None:
-    stimuli.fix.draw()
+def draw_fixation_x(stimuli: Stimuli) -> None:
+    """Within-trial fixation glyph (matches MATLAB fixation phase + pre-target buffer)."""
+    stimuli.fix_x.draw()
+
+
+def draw_fixation_o(stimuli: Stimuli) -> None:
+    """ITI / leadin / leadout fixation glyph (matches MATLAB DisplayITI 'o')."""
+    stimuli.fix_o.draw()
 
 
 def draw_target(stimuli: Stimuli) -> None:
@@ -202,12 +207,5 @@ def draw_target(stimuli: Stimuli) -> None:
 
 
 def draw_feedback(stimuli: Stimuli, hit: bool, reward_outcome: str) -> None:
-    if hit:
-        stimuli.feedback_exp.text = "You won!"
-        stimuli.feedback_exp.color = "Green"
-    else:
-        stimuli.feedback_exp.text = "You missed!"
-        stimuli.feedback_exp.color = "Red"
-    stimuli.feedback_trial.text = f"Trial outcome: {reward_outcome}"
-    stimuli.feedback_trial.draw()
-    stimuli.feedback_exp.draw()
+    stimuli.feedback_amount.text = reward_outcome
+    stimuli.feedback_amount.draw()

@@ -31,26 +31,30 @@ class SessionInfo:
 
 def show_dialog() -> SessionInfo:
     """Present the startup dialog and return a SessionInfo."""
+    default_base_rt_ms = int(round(config.BASE_RT_S * 1000.0))
     fields = {
         "Subject ID": "XXX000",
         "fMRI? (yes/no)": "no",
         "Task number (1/2/practice)": "practice",
         "Show instructions? (yes/no)": "yes",
-        "Baseline RT (ms; blank=default)": "",
+        "Baseline RT (ms; 250-280 typical, 400 for practice)": str(default_base_rt_ms),
     }
-    dlg = gui.DlgFromDict(dictionary=fields, title="MID Task (Deterministic)")
-    if not dlg.OK:
-        core.quit()
+    while True:
+        dlg = gui.DlgFromDict(dictionary=fields, title="MID Task (Deterministic)")
+        if not dlg.OK:
+            core.quit()
 
-    run_n = str(fields["Task number (1/2/practice)"]).strip()
-    base_rt_ms_raw = str(fields["Baseline RT (ms; blank=default)"]).strip()
-    if base_rt_ms_raw:
-        base_rt_ms = float(base_rt_ms_raw)
-    else:
-        default_s = (
-            config.BASE_RT_PRACTICE_S if run_n == "practice" else config.BASE_RT_S
-        )
-        base_rt_ms = default_s * 1000.0
+        run_n = str(fields["Task number (1/2/practice)"]).strip()
+        base_rt_ms_raw = str(fields["Baseline RT (ms; 250-280 typical, 400 for practice)"]).strip()
+        try:
+            base_rt_ms = float(base_rt_ms_raw)
+        except ValueError:
+            gui.warnDlg(prompt=f"Baseline RT must be a number (got '{base_rt_ms_raw}').")
+            continue
+        if base_rt_ms <= 0:
+            gui.warnDlg(prompt=f"Baseline RT must be > 0 ms (got {base_rt_ms}).")
+            continue
+        break
 
     return SessionInfo(
         subject_id=str(fields["Subject ID"]),
@@ -74,7 +78,7 @@ def setup_screen() -> tuple[list[int], visual.Window]:
         fullscr=True,
         monitor=exp_mon,
         units="height",
-        color=(0.2, 0.2, 0.2),
+        color=(-1, -1, -1),
     )
     return win_res, win
 
