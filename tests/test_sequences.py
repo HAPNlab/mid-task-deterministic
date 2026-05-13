@@ -94,7 +94,7 @@ def test_no_unexpected_iti_values(run_n):
 def test_sequences_order():
     """checks whether the sequences spreadsheets were copied correctly from the Matlab task."""
 
-    # These variables below were copied straight from the Matlab codebase
+    # These variables below were copied straight from the MATLAB codebase
     runs = {
         "1": {
             "cues": [1, 2, 2, 4, 4, 6, 4, 4, 3, 2, 5, 1, 5, 5, 6, 3, 4, 2, 1, 2, 6, 3, 6, 5, 3, 2, 5,
