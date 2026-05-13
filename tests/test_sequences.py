@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 
 from mid_det import config
-from mid_det.session import load_sequence
+from mid_det.sequences import load_sequence
 
 
 # ── schema ────────────────────────────────────────────────────────────────────
@@ -90,3 +90,50 @@ def test_no_unexpected_iti_values(run_n):
     assert not unexpected, (
         f"run={run_n}: unexpected n_iti values {unexpected}"
     )
+
+def test_sequences_order():
+    """checks whether the sequences spreadsheets were copied correctly from the Matlab task."""
+
+    # These variables below were copied straight from the Matlab codebase
+    runs = {
+        "1": {
+            "cues": [1, 2, 2, 4, 4, 6, 4, 4, 3, 2, 5, 1, 5, 5, 6, 3, 4, 2, 1, 2, 6, 3, 6, 5, 3, 2, 5,
+                     1, 5, 6, 1, 4, 2, 4, 6, 1, 6, 3, 5, 3, 3, 1],
+            "seconds_iti": [6, 6, 6, 2, 4, 4, 6, 4, 6, 4, 6, 2, 2, 6, 2, 4, 4, 6, 2, 4, 6, 6, 4, 2, 4, 6, 4,
+                            2, 2, 6, 6, 6, 2, 2, 4, 4, 2, 4, 2, 2, 2, 4]
+        },
+        "2": {
+            "cues": [4, 2, 5, 1, 6, 2, 4, 1, 4, 3, 2, 6, 2, 4, 3, 2, 3, 3, 6, 6, 3, 2, 1, 3, 4, 5, 2,
+                     5, 1, 5, 6, 5, 3, 3, 6, 5, 5, 2, 1, 6, 4, 4, 1, 4, 5, 1, 1, 6],
+            "seconds_iti": [6, 4, 2, 2, 4, 4, 6, 2, 2, 6, 6, 4, 6, 4, 2, 6, 2, 6, 4, 6, 2, 6, 6, 4, 2, 4, 6,
+                            2, 6, 2, 4, 6, 6, 4, 2, 4, 4, 4, 2, 4, 4, 4, 6, 2, 6, 2, 2, 2]
+        },
+        "practice": {
+            "cues": [3, 4, 6, 1, 3, 2, 5, 5, 1, 6, 2, 4],
+            "seconds_iti": [2, 4, 2, 4, 2, 6, 6, 4, 4, 2, 6, 6]
+        }
+    }
+
+    cues_conversion = {
+        1: ("loss", 0),
+        2: ("loss", 1),
+        3: ("loss", 5),
+        4: ("gain", 0),
+        5: ("gain", 1),
+        6: ("gain", 5)
+    }
+
+    for run_name, run_spec in runs.items():
+        expected_sequence = []
+
+        for cue_raw, seconds_iti in zip(run_spec["cues"], run_spec["seconds_iti"]):
+            valence, magnitude = cues_conversion[cue_raw]
+
+            expected_sequence.append({
+                "valence": valence,
+                "magnitude": magnitude,
+                "n_iti": seconds_iti // 2,
+            })
+
+        actual_sequence = load_sequence(run_name).to_dict("records")
+        assert actual_sequence == expected_sequence
