@@ -15,7 +15,7 @@ from psychopy import event as psy_event, logging
 from psychopy.hardware import keyboard
 from rich.console import Console
 
-from mid_det import config, display, recorder, scanner, session, trial
+from mid_det import config, display, recorder, scanner, sequences, session, trial
 from mid_det.calibration import CalibrationState
 from mid_det.console import TrialLiveView
 
@@ -51,7 +51,7 @@ def run() -> None:
     display.update_instr_keys(stimuli_obj, session_info.fmri)
 
     # ── LOAD SEQUENCE ────────────────────────────────────────────────────────
-    sequence = session.load_sequence(session_info.run_n)
+    sequence = sequences.load_sequence(session_info.run_n)
     n_trials = len(sequence)
 
     # ── ADAPTIVE CALIBRATION ────────────────────────────────────────────────
