@@ -22,27 +22,27 @@ class CalibrationState:
     rt_change_s: float = config.RT_CHANGE_S
     win_ratio_threshold: float = config.WIN_RATIO_THRESHOLD
     min_trials_for_adapt: int = config.MIN_TRIALS_FOR_ADAPT
-    _calibrations: dict[tuple[str, int], list[float]] = field(default_factory=dict)
+    _last_cal: dict[tuple[str, int], float | None] = field(default_factory=dict)
     _wins: dict[tuple[str, int], list[int]] = field(default_factory=dict)
 
     def next_target_dur_s(self, valence: str, magnitude: int) -> float:
         """Compute and stage the target window for this trial of (valence, magnitude)."""
         key = (valence, magnitude)
-        prior_cals = self._calibrations.setdefault(key, [])
+        last = self._last_cal.get(key)
         prior_wins = self._wins.setdefault(key, [])
 
-        if not prior_cals:
+        if last is None:
             current = self.base_rt_s
         elif len(prior_wins) >= self.min_trials_for_adapt:
             ratio = sum(prior_wins) / len(prior_wins)
             if ratio > self.win_ratio_threshold:
-                current = prior_cals[-1] - self.rt_change_s
+                current = last - self.rt_change_s
             else:
-                current = prior_cals[-1] + self.rt_change_s
+                current = last + self.rt_change_s
         else:
-            current = prior_cals[-1]
+            current = last
 
-        prior_cals.append(current)
+        self._last_cal[key] = current
         return current
 
     def record_outcome(self, valence: str, magnitude: int, hit: bool) -> None:
