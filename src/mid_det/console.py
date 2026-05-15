@@ -47,7 +47,7 @@ class TrialLiveView:
 
     def __init__(self, console: Console, n_trials: int) -> None:
         self._n_trials = n_trials
-        self._live = Live(console=console, auto_refresh=False)
+        self._live = Live(console=console, auto_refresh=False, vertical_overflow="visible")
         self._rows: list[_RowData] = []
         self._current: _RowData | None = None
         self._n_hits_snapshot = 0
