@@ -9,7 +9,8 @@ from datetime import datetime
 from pathlib import Path
 
 import pyglet
-from psychopy import core, event as psy_event, gui, monitors, visual
+from psychopy import core, gui, monitors, visual
+from psychopy.hardware import keyboard
 
 from mid_det import config
 
@@ -92,6 +93,7 @@ def display_instructions(
     win: visual.Window,
     stimuli,              # Stimuli dataclass from display.py; avoid circular import
     session_info: SessionInfo,
+    kb: keyboard.Keyboard,
 ) -> None:
     """Display instructions from text/instructions_MID.txt one page at a time."""
     keys_map = config.KEYS_FMRI if session_info.fmri else config.KEYS_BEHAVIORAL
@@ -111,7 +113,7 @@ def display_instructions(
     if not pages:
         return
 
-    psy_event.clearEvents()
+    kb.clearEvents()
     page_idx = 0
 
     while True:
@@ -123,10 +125,10 @@ def display_instructions(
             stimuli.instr_move.draw()
         win.flip()
 
-        pressed = psy_event.getKeys(keyList=[forward_key, back_key, end_key])
+        pressed = kb.getKeys(keyList=[forward_key, back_key, end_key], waitRelease=False)
         if not pressed:
             continue
-        key_name = pressed[0]
+        key_name = pressed[0].name
         if key_name == end_key:
             core.quit()
         elif key_name == back_key and page_idx > 0:
@@ -139,5 +141,5 @@ def display_instructions(
     while True:
         stimuli.instr_finish.draw()
         win.flip()
-        if psy_event.getKeys(keyList=[start_key]):
+        if kb.getKeys(keyList=[start_key], waitRelease=False):
             break

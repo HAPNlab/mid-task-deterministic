@@ -9,9 +9,13 @@ from pathlib import Path
 
 # Must be set before any other PsychoPy import (prevents macOS pyglet crash).
 from psychopy import core
+
 core.checkPygletDuringWait = False
 
-from psychopy import event as psy_event, logging
+from psychopy import logging, prefs
+
+prefs.hardware["keyboardBackend"] = "ptb"
+
 from psychopy.hardware import keyboard
 from rich.console import Console
 
@@ -86,7 +90,7 @@ def run() -> None:
 
     # ── INSTRUCTIONS ─────────────────────────────────────────────────────────
     if session_info.show_instructions:
-        session.display_instructions(win, stimuli_obj, session_info)
+        session.display_instructions(win, stimuli_obj, session_info, kb)
 
     # ── PULSE COUNTER ────────────────────────────────────────────────────────
     backend = scanner.make_backend(session_info.fmri)
@@ -105,7 +109,7 @@ def run() -> None:
         pulse_counter.wait_for_start()
     else:
         keys_map = config.KEYS_BEHAVIORAL
-        psy_event.waitKeys(keyList=[keys_map["start"]])
+        kb.waitKeys(keyList=[keys_map["start"]], waitRelease=False)
     backend.start()
     rcon.print("[bold green]Scan started[/bold green] — global clock reset")
     logging.exp("Scan started — global clock reset")
@@ -197,7 +201,7 @@ def run() -> None:
     # ── END SCREEN ───────────────────────────────────────────────────────────
     stimuli_obj.end.draw()
     win.flip()
-    psy_event.waitKeys(keyList=["0"])
+    kb.waitKeys(keyList=["0"], waitRelease=False)
 
     # ── CLEANUP ──────────────────────────────────────────────────────────────
     behavioral_writer.close()

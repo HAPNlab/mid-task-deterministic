@@ -9,7 +9,7 @@ import random
 from collections.abc import Callable
 
 import pandas as pd
-from psychopy import core, event as psy_event, logging, visual
+from psychopy import core, logging, visual
 from psychopy.hardware import keyboard
 
 from mid_det import config
@@ -47,13 +47,13 @@ def run_fixation(
     kb: keyboard.Keyboard,
 ) -> bool:
     """Display fixation; return True if any response key was pressed (early press)."""
-    psy_event.clearEvents()
+    kb.clearEvents()
     timer = core.CountdownTimer(config.STUDY_TIMES_S["fixation"])
     while timer.getTime() > 0:
         draw_fixation_x(stimuli)
         win.flip()
         _check_quit(kb)
-    keys = psy_event.getKeys(keyList=config.EXP_KEYS)
+    keys = kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False)
     return len(keys) > 0
 
 
@@ -77,14 +77,14 @@ def run_response(
     hit = False
     rt_s: float | None = None
 
-    psy_event.clearEvents()
+    kb.clearEvents()
 
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
         t = phase_clock.getTime()
 
         if not clock_reset_scheduled and t >= jitter_s:
             win.callOnFlip(kb.clock.reset)
-            win.callOnFlip(psy_event.clearEvents)
+            win.callOnFlip(kb.clearEvents)
             clock_reset_scheduled = True
             target_shown = True
 
@@ -98,13 +98,13 @@ def run_response(
         win.flip()
 
         if not target_shown and not early_press:
-            if psy_event.getKeys(keyList=config.EXP_KEYS):
+            if kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
                 early_press = True
 
         if target_shown and not hit and rt_s is None and not early_press:
-            keys = psy_event.getKeys(keyList=config.EXP_KEYS, timeStamped=kb.clock)
+            keys = kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False)
             if keys:
-                rt_s = keys[0][-1]
+                rt_s = keys[0].rt
                 if not target_removed:
                     hit = True
 
@@ -173,8 +173,7 @@ def run_iti(
 
 
 def _check_quit(kb: keyboard.Keyboard) -> None:
-    keys = psy_event.getKeys(keyList=["escape", "l"])
-    if keys:
+    if kb.getKeys(keyList=["escape", "l"], waitRelease=False):
         core.quit()
 
 
