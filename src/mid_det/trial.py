@@ -64,11 +64,11 @@ def run_response(
     jitter_s: float,
     target_dur_s: float,
     early_press: bool,
-) -> tuple[bool, float | None, bool]:
+) -> tuple[bool, float | None, bool, float | None]:
     """
     Display response phase (STUDY_TIMES_S['response'] seconds total).
     Target appears after jitter_s and stays visible for target_dur_s seconds.
-    Returns (hit, rt_s, early_press).
+    Returns (hit, rt_s, early_press, target_removed_at).
     """
     phase_clock = core.Clock()
     target_shown = False
@@ -120,7 +120,7 @@ def run_response(
 
         _check_quit(kb)
 
-    return hit, rt_s, early_press
+    return hit, rt_s, early_press, target_removed_at
 
 
 def _compute_reward(
@@ -265,10 +265,11 @@ def run_trial(
         phase_trial_time=response_start - time_onset,
         pulse_ct=pulse_ct,
     ))
-    hit, rt_s, early_press = run_response(
+    hit, rt_s, early_press, target_removed_at = run_response(
         win, stimuli, kb, jitter_s, target_dur_s, early_press
     )
     nominal_time += config.STUDY_TIMES_S["response"]
+    target_dur_ms_actual = round(target_removed_at * 1000, 2) if target_removed_at is not None else ""
     if on_response is not None:
         on_response(hit, rt_s, early_press, target_dur_ms)
 
@@ -319,6 +320,7 @@ def run_trial(
         time_onset=round(time_onset, 6),
         jitter_ms=int(round(jitter_s * 1000)),
         target_dur_ms=target_dur_ms,
+        target_dur_ms_actual=target_dur_ms_actual,
         early_press=int(early_press),
         hit=int(hit),
         rt_ms=round(rt_s * 1000, 2) if rt_s is not None else "",

@@ -24,6 +24,7 @@ class TrialRecord:
     time_onset: float
     jitter_ms: int
     target_dur_ms: int
+    target_dur_ms_actual: float | str
     early_press: int
     hit: int
     rt_ms: float | str
@@ -51,7 +52,7 @@ class ScanPhase:
 
 BEHAVIORAL_COLUMNS: list[str] = [
     "trial_n", "trial_type", "valence", "magnitude", "cue_label",
-    "time_onset", "jitter_ms", "target_dur_ms", "early_press", "hit", "rt_ms",
+    "time_onset", "jitter_ms", "target_dur_ms", "target_dur_ms_actual", "early_press", "hit", "rt_ms",
     "reward_outcome", "total_earned", "time_trial_end", "trial_dur_ms",
     "time_sched_end", "timing_drift_ms", "total_trs", "subject_id", "run_n",
     "pulse_ct",

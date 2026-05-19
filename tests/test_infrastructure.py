@@ -41,7 +41,7 @@ def test_behavioral_csv_roundtrip(tmp_path: Path):
     w = BehavioralCsvWriter(path)
     rec = TrialRecord(
         trial_n=1, trial_type=6, valence="gain", magnitude=5,
-        cue_label="+$5.00", time_onset=0.0, jitter_ms=10, target_dur_ms=265,
+        cue_label="+$5.00", time_onset=0.0, jitter_ms=10, target_dur_ms=265, target_dur_ms_actual=266.67,
         early_press=0, hit=1, rt_ms=234.5, reward_outcome="+$5.00",
         total_earned=5, time_trial_end=10.0, trial_dur_ms=10000,
         time_sched_end=10.0, timing_drift_ms=0.0, total_trs=5,
