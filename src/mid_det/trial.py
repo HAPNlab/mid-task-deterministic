@@ -77,11 +77,13 @@ def run_response(
     hit = False
     rt_s: float | None = None
 
+    # Clear stale key events before the phase begins
     kb.clearEvents()
 
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
         t = phase_clock.getTime()
 
+        # Schedule kb.clock reset to fire on the next flip so t=0 aligns with target onset
         if not clock_reset_scheduled and t >= jitter_s:
             win.callOnFlip(kb.clock.reset)
             clock_reset_scheduled = True
@@ -89,15 +91,18 @@ def run_response(
 
         should_remove = target_removed_at is None and (t - jitter_s) >= target_dur_s
 
+        # Draw before flip: omitting draw_target when should_remove clears the target on this flip
         if target_shown and target_removed_at is None and not should_remove:
             draw_target(stimuli)
         elif not target_shown:
             draw_fixation_x(stimuli)
         win.flip()
 
+        # Timestamp after flip so it reflects when the target actually left the screen
         if should_remove:
             target_removed_at = kb.clock.getTime()
 
+        # Poll keys after flip so timestamps are relative to the most recent screen state
         if not target_shown and not early_press:
             if kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
                 early_press = True
