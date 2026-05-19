@@ -87,7 +87,7 @@ def run_response(
             clock_reset_scheduled = True
             target_shown = True
 
-        should_remove = target_shown and target_removed_at is None and (t - jitter_s) >= target_dur_s
+        should_remove = target_removed_at is None and (t - jitter_s) >= target_dur_s
 
         if target_shown and target_removed_at is None and not should_remove:
             draw_target(stimuli)
