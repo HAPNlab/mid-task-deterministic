@@ -72,7 +72,7 @@ def run_response(
     """
     phase_clock = core.Clock()
     target_shown = False
-    target_removed = False
+    target_removed_at: float | None = None
     clock_reset_scheduled = False
     hit = False
     rt_s: float | None = None
@@ -84,18 +84,19 @@ def run_response(
 
         if not clock_reset_scheduled and t >= jitter_s:
             win.callOnFlip(kb.clock.reset)
-            win.callOnFlip(kb.clearEvents)
             clock_reset_scheduled = True
             target_shown = True
 
-        if target_shown and not target_removed and (t - jitter_s) >= target_dur_s:
-            target_removed = True
+        should_remove = target_shown and target_removed_at is None and (t - jitter_s) >= target_dur_s
 
-        if target_shown and not target_removed:
+        if target_shown and target_removed_at is None and not should_remove:
             draw_target(stimuli)
         elif not target_shown:
             draw_fixation_x(stimuli)
         win.flip()
+
+        if should_remove:
+            target_removed_at = kb.clock.getTime()
 
         if not target_shown and not early_press:
             if kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
@@ -104,9 +105,13 @@ def run_response(
         if target_shown and not hit and rt_s is None and not early_press:
             keys = kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False)
             if keys:
-                rt_s = keys[0].rt
-                if not target_removed:
-                    hit = True
+                rt = keys[0].rt
+                if rt < 0:
+                    early_press = True
+                else:
+                    rt_s = rt
+                    if target_removed_at is None or rt < target_removed_at:
+                        hit = True
 
         _check_quit(kb)
 
