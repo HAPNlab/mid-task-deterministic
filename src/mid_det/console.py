@@ -17,6 +17,7 @@ class _RowData:
     trial_label: str
     cue_label: str
     window_str: str = _DIM
+    actual_str: str = _DIM
     result_cell: str = _DIM
     rt_str: str = _DIM
     outcome_str: str = _DIM
@@ -29,6 +30,7 @@ def _make_table(rows: list[_RowData]) -> Table:
     t.add_column("#", justify="right")
     t.add_column("Cue")
     t.add_column("Window", justify="right")
+    t.add_column("Actual", justify="right")
     t.add_column("Result")
     t.add_column("RT", justify="right")
     t.add_column("Outcome", justify="right")
@@ -36,7 +38,7 @@ def _make_table(rows: list[_RowData]) -> Table:
     t.add_column("Hit %", justify="right")
     for r in rows:
         t.add_row(
-            r.trial_label, r.cue_label, r.window_str,
+            r.trial_label, r.cue_label, r.window_str, r.actual_str,
             r.result_cell, r.rt_str, r.outcome_str, r.total_str, r.hit_rate_str,
         )
     return t
@@ -72,12 +74,18 @@ class TrialLiveView:
         self._refresh()
 
     def on_response(
-        self, hit: bool, rt_s: float | None, early_press: bool, target_dur_ms: int
+        self,
+        hit: bool,
+        rt_s: float | None,
+        early_press: bool,
+        target_dur_ms: int,
+        target_dur_ms_actual: float | str,
     ) -> None:
-        """Called by run_trial after the response phase."""
+        """Called by run_trial after the response phase. Buffers data; does not refresh."""
         r = self._current
         assert r is not None
         r.window_str = f"{target_dur_ms} ms"
+        r.actual_str = f"{target_dur_ms_actual} ms" if target_dur_ms_actual != "" else "—"
         if hit:
             r.result_cell = "[green]HIT[/green]"
         elif early_press:
@@ -85,10 +93,9 @@ class TrialLiveView:
         else:
             r.result_cell = "[red]miss[/red]"
         r.rt_str = f"{rt_s * 1000:.0f} ms" if rt_s is not None else "—"
-        self._refresh()
 
     def on_outcome(self, reward_outcome: str, new_total_earned: int, hit: bool) -> None:
-        """Called by run_trial right after the outcome phase."""
+        """Called by run_trial after the outcome phase. Applies all buffered data and refreshes."""
         r = self._current
         assert r is not None
         r.outcome_str = reward_outcome

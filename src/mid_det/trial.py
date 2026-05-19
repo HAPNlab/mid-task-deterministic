@@ -202,7 +202,7 @@ def run_trial(
     pulse_ct: int,
     pulse_counter: PulseCounter,
     calibration: CalibrationState,
-    on_response: Callable[[bool, float | None, bool, int], None] | None = None,
+    on_response: Callable[[bool, float | None, bool, int, float | str], None] | None = None,
     on_outcome: Callable[[str, int, bool], None] | None = None,
 ) -> tuple[TrialRecord, list[ScanPhase], float, int]:
     """
@@ -271,7 +271,7 @@ def run_trial(
     nominal_time += config.STUDY_TIMES_S["response"]
     target_dur_ms_actual = round(target_removed_at * 1000, 2) if target_removed_at is not None else ""
     if on_response is not None:
-        on_response(hit, rt_s, early_press, target_dur_ms)
+        on_response(hit, rt_s, early_press, target_dur_ms, target_dur_ms_actual)
 
     # ── OUTCOME ──────────────────────────────────────────────────────────────
     pulse_ct += pulse_counter.wait_for_tr()
