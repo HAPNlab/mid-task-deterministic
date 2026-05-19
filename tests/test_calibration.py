@@ -97,10 +97,9 @@ def test_ratio_exactly_066_grows():
     """
     base = 0.300
     cal = CalibrationState(base_rt_s=base)
-    _run_cue(cal, "gain", 1, [True] * 33 + [False] * 17)
+    windows = _run_cue(cal, "gain", 1, [True] * 33 + [False] * 17)
     w_next = cal.next_target_dur_s("gain", 1)
-    w_prev = cal._calibrations[("gain", 1)][-2]
-    assert w_next == pytest.approx(w_prev + 0.020)
+    assert w_next == pytest.approx(windows[-1] + 0.020)
 
 
 # ── per-cue independence ──────────────────────────────────────────────────────
