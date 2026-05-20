@@ -14,6 +14,7 @@ from psychopy.hardware import keyboard
 
 from mid_det import config
 from mid_det.calibration import CalibrationState
+from mid_det.debug import DebugOverlay
 from mid_det.display import (
     Stimuli,
     draw_cue,
@@ -32,19 +33,21 @@ def run_cue(
     valence: str,
     magnitude: int,
     kb: keyboard.Keyboard,
+    overlay: DebugOverlay | None = None,
 ) -> None:
     """Display cue for STUDY_TIMES_S['cue'] seconds."""
     timer = core.CountdownTimer(config.STUDY_TIMES_S["cue"])
     while timer.getTime() > 0:
         draw_cue(stimuli, valence, magnitude)
         win.flip()
-        _check_quit(kb)
+        _check_quit(kb, overlay)
 
 
 def run_fixation(
     win: visual.Window,
     stimuli: Stimuli,
     kb: keyboard.Keyboard,
+    overlay: DebugOverlay | None = None,
 ) -> bool:
     """Display fixation; return True if any response key was pressed (early press)."""
     kb.clearEvents()
@@ -52,7 +55,7 @@ def run_fixation(
     while timer.getTime() > 0:
         draw_fixation_x(stimuli)
         win.flip()
-        _check_quit(kb)
+        _check_quit(kb, overlay)
     keys = kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False)
     return len(keys) > 0
 
@@ -65,6 +68,7 @@ def run_response(
     target_dur_s: float,
     frame_dur_s: float | None,
     early_press: bool,
+    overlay: DebugOverlay | None = None,
 ) -> tuple[bool, float | None, bool, float | None]:
     """
     Display response phase (STUDY_TIMES_S['response'] seconds total).
@@ -135,7 +139,7 @@ def run_response(
                     if target_removed_at is None or rt < target_removed_at:
                         hit = True
 
-        _check_quit(kb)
+        _check_quit(kb, overlay)
 
     return hit, rt_s, early_press, target_removed_at
 
@@ -172,6 +176,7 @@ def run_outcome(
     valence: str,
     magnitude: int,
     total_earned: int,
+    overlay: DebugOverlay | None = None,
 ) -> tuple[str, int]:
     """Display outcome; return (reward_outcome, new_total_earned)."""
     reward_outcome, new_total_earned = _compute_reward(hit, valence, magnitude, total_earned)
@@ -179,7 +184,7 @@ def run_outcome(
     while timer.getTime() > 0:
         draw_feedback(stimuli, hit, reward_outcome)
         win.flip()
-        _check_quit(kb)
+        _check_quit(kb, overlay)
     return reward_outcome, new_total_earned
 
 
@@ -188,6 +193,7 @@ def run_iti(
     stimuli: Stimuli,
     kb: keyboard.Keyboard,
     fix_dur_s: float,
+    overlay: DebugOverlay | None = None,
 ) -> None:
     """Display fixation for fix_dur_s seconds (drift-corrected by caller)."""
     if fix_dur_s <= 0:
@@ -196,12 +202,14 @@ def run_iti(
     while timer.getTime() > 0:
         draw_fixation_o(stimuli)
         win.flip()
-        _check_quit(kb)
+        _check_quit(kb, overlay)
 
 
-def _check_quit(kb: keyboard.Keyboard) -> None:
+def _check_quit(kb: keyboard.Keyboard, overlay: DebugOverlay | None = None) -> None:
     if kb.getKeys(keyList=["escape", "l"], waitRelease=False):
         core.quit()
+    if overlay is not None and kb.getKeys(keyList=["grave"], waitRelease=False):
+        overlay.toggle()
 
 
 def run_trial(
@@ -222,6 +230,7 @@ def run_trial(
     frame_dur_s: float | None,
     on_response: Callable[[bool, float | None, bool, int, float | str], None] | None = None,
     on_outcome: Callable[[str, int, bool], None] | None = None,
+    overlay: DebugOverlay | None = None,
 ) -> tuple[TrialRecord, list[ScanPhase], float, int]:
     """
     Run one complete trial (cue → fixation → response → outcome → ITI).
@@ -247,6 +256,17 @@ def run_trial(
     scan_phases: list[ScanPhase] = []
     tr_within = 0
 
+    def _update_overlay(phase: str) -> None:
+        if overlay is not None:
+            overlay.state.phase = phase
+            overlay.state.valence = valence
+            overlay.state.magnitude = magnitude
+            overlay.state.target_dur_ms = target_dur_ms
+            overlay.state.jitter_ms = int(jitter_s * 1000)
+            overlay.state.pulse_ct = pulse_ct
+            overlay.state.global_time = global_clock.getTime()
+            overlay.state.nominal_time = nominal_time
+
     # ── CUE ─────────────────────────────────────────────────────────────────
     pulse_ct += pulse_counter.drain()
     time_onset = global_clock.getTime()
@@ -257,7 +277,8 @@ def run_trial(
         phase_trial_time=0.0,
         pulse_ct=pulse_ct,
     ))
-    run_cue(win, stimuli, valence, magnitude, kb)
+    _update_overlay("cue")
+    run_cue(win, stimuli, valence, magnitude, kb, overlay)
     nominal_time += config.STUDY_TIMES_S["cue"]
 
     # ── FIXATION ──────────────────────────────────────────────────────────────
@@ -270,7 +291,8 @@ def run_trial(
         phase_trial_time=fixation_start - time_onset,
         pulse_ct=pulse_ct,
     ))
-    early_press = run_fixation(win, stimuli, kb)
+    _update_overlay("fixation")
+    early_press = run_fixation(win, stimuli, kb, overlay)
     nominal_time += config.STUDY_TIMES_S["fixation"]
 
     # ── RESPONSE ─────────────────────────────────────────────────────────────
@@ -283,8 +305,9 @@ def run_trial(
         phase_trial_time=response_start - time_onset,
         pulse_ct=pulse_ct,
     ))
+    _update_overlay("response")
     hit, rt_s, early_press, target_removed_at = run_response(
-        win, stimuli, kb, jitter_s, target_dur_s, frame_dur_s, early_press
+        win, stimuli, kb, jitter_s, target_dur_s, frame_dur_s, early_press, overlay
     )
     nominal_time += config.STUDY_TIMES_S["response"]
     target_dur_ms_actual = round(target_removed_at * 1000, 2) if target_removed_at is not None else ""
@@ -301,8 +324,9 @@ def run_trial(
         phase_trial_time=outcome_start - time_onset,
         pulse_ct=pulse_ct,
     ))
+    _update_overlay("outcome")
     reward_outcome, total_earned = run_outcome(
-        win, stimuli, kb, hit, valence, magnitude, total_earned
+        win, stimuli, kb, hit, valence, magnitude, total_earned, overlay
     )
     nominal_time += config.STUDY_TIMES_S["outcome"]
     calibration.record_outcome(valence, magnitude, bool(hit))
@@ -323,7 +347,8 @@ def run_trial(
         actual_time = global_clock.getTime()
         iti_dur = config.STUDY_TIMES_S["iti"] - (actual_time - nominal_time)
         nominal_time += config.STUDY_TIMES_S["iti"]
-        run_iti(win, stimuli, kb, iti_dur)
+        _update_overlay("iti")
+        run_iti(win, stimuli, kb, iti_dur, overlay)
 
     # ── BUILD RECORD ─────────────────────────────────────────────────────────
     time_trial_end = global_clock.getTime()
@@ -353,5 +378,10 @@ def run_trial(
         run_n=run_n,
         pulse_ct=scan_phases[0].pulse_ct,
     )
+
+    if overlay is not None:
+        overlay.state.last_result = "HIT" if record.hit else ("early" if record.early_press else "miss")
+        overlay.state.last_rt_ms = f"{record.rt_ms:.0f} ms" if record.rt_ms != "" else "—"
+        overlay.state.last_timing_drift_ms = record.timing_drift_ms
 
     return record, scan_phases, nominal_time, total_earned

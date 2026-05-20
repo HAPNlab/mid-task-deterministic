@@ -22,26 +22,42 @@ from rich.console import Console
 from mid_det import config, display, recorder, scanner, sequences, session, trial
 from mid_det.calibration import CalibrationState
 from mid_det.console import TrialLiveView
+from mid_det.debug import DebugOverlay, DebugState
 
 
 def run() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(prog="mid-task-det")
+    parser.add_argument(
+        "--fps", type=float, default=None, metavar="HZ",
+        help="Override refresh rate used for timing compensation (e.g. 60). "
+             "Bypasses getActualFrameRate(); useful when VSYNC measurement fails.",
+    )
+    args = parser.parse_args()
+
     # ── INITIALISE SESSION ───────────────────────────────────────────────────
     session_info = session.show_dialog()
     session_time = datetime.now()
 
     win_res, win = session.setup_screen()
 
-    # PsychoPy returns None when it can't get a stable measurement (typically a
-    # sign that VSYNC isn't working on this system). Propagate that — don't
-    # silently fall back to an assumed rate, because downstream code that uses
-    # frame_dur_s for timing compensation would then be working from a guess.
-    measured_fps = win.getActualFrameRate()
-    if measured_fps is not None and 30.0 <= measured_fps <= 200.0:
-        frame_rate: float | None = measured_fps
-        frame_dur_s: float | None = 1.0 / measured_fps
+    if args.fps is not None:
+        frame_rate: float | None = args.fps
+        frame_dur_s: float | None = 1.0 / args.fps
+        fps_source = "specified"
     else:
-        frame_rate = None
-        frame_dur_s = None
+        # PsychoPy returns None when it can't get a stable measurement (typically a
+        # sign that VSYNC isn't working on this system). Propagate that — don't
+        # silently fall back to an assumed rate, because downstream code that uses
+        # frame_dur_s for timing compensation would then be working from a guess.
+        measured_fps = win.getActualFrameRate()
+        if measured_fps is not None and 30.0 <= measured_fps <= 200.0:
+            frame_rate = measured_fps
+            frame_dur_s = 1.0 / measured_fps
+        else:
+            frame_rate = None
+            frame_dur_s = None
+        fps_source = "measured"
 
     # ── LOGGING ──────────────────────────────────────────────────────────────
     data_dir = Path("data")
@@ -56,12 +72,13 @@ def run() -> None:
         f"run=[cyan]{session_info.run_n}[/cyan]  fmri=[cyan]{session_info.fmri}[/cyan]"
     )
     if frame_rate is not None:
+        source_tag = "[yellow](manually specified)[/yellow]" if fps_source == "specified" else "(measured)"
         rcon.print(
             f"[bold]Frame rate:[/bold] {frame_rate:.2f} Hz  "
-            f"(frame period [cyan]{frame_dur_s * 1000:.3f} ms[/cyan])"
+            f"(frame period [cyan]{frame_dur_s * 1000:.3f} ms[/cyan])  {source_tag}"
         )
         logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
-        logging.exp(f"Frame rate: {frame_rate:.2f} Hz  (frame period {frame_dur_s * 1000:.3f} ms)")
+        logging.exp(f"Frame rate: {frame_rate:.2f} Hz  (frame period {frame_dur_s * 1000:.3f} ms)  [{fps_source}]")
     else:
         rcon.print(
             "[bold yellow]Frame rate:[/bold yellow] could not be measured "
@@ -74,9 +91,25 @@ def run() -> None:
     stimuli_obj = display.build_stimuli(win)
     display.update_instr_keys(stimuli_obj, session_info.fmri)
 
+    # ── DEBUG OVERLAY (F3 to toggle) ─────────────────────────────────────────
+    debug_state = DebugState(
+        subject_id=session_info.subject_id,
+        run_n=session_info.run_n,
+        fmri=session_info.fmri,
+        frame_rate=frame_rate,
+        frame_dur_ms=frame_dur_s * 1000 if frame_dur_s is not None else None,
+    )
+    debug_overlay = DebugOverlay(win, debug_state)
+    _orig_flip = win.flip
+    def _flip_with_overlay(*args, **kwargs):  # noqa: E306
+        debug_overlay.draw()
+        return _orig_flip(*args, **kwargs)
+    win.flip = _flip_with_overlay
+
     # ── LOAD SEQUENCE ────────────────────────────────────────────────────────
     sequence = sequences.load_sequence(session_info.run_n)
     n_trials = len(sequence)
+    debug_state.n_trials = n_trials
 
     # ── ADAPTIVE CALIBRATION ────────────────────────────────────────────────
     base_rt_s = session_info.base_rt_s
@@ -146,6 +179,8 @@ def run() -> None:
     while global_clock.getTime() < t_fix_end:
         stimuli_obj.fix_o.draw()
         win.flip()
+        if kb.getKeys(keyList=["grave"], waitRelease=False):
+            debug_overlay.toggle()
 
     nominal_time = global_clock.getTime()
 
@@ -162,6 +197,11 @@ def run() -> None:
             cue_lbl = config.cue_label(str(row["valence"]), int(row["magnitude"]))
 
             view.start_trial(trial_n, cue_lbl, n_hits, n_trials_done)
+
+            debug_overlay.state.trial_n = trial_n
+            debug_overlay.state.n_hits = n_hits
+            debug_overlay.state.n_trials_done = n_trials_done
+            debug_overlay.state.total_earned = total_earned
 
             rec, scan_phases, nominal_time, total_earned = trial.run_trial(
                 win=win,
@@ -181,6 +221,7 @@ def run() -> None:
                 frame_dur_s=frame_dur_s,
                 on_response=view.on_response,
                 on_outcome=view.on_outcome,
+                overlay=debug_overlay,
             )
 
             if scan_phases:
@@ -218,6 +259,8 @@ def run() -> None:
     while global_clock.getTime() < t_close_start + leadout_s:
         stimuli_obj.fix_o.draw()
         win.flip()
+        if kb.getKeys(keyList=["grave"], waitRelease=False):
+            debug_overlay.toggle()
 
     # ── END SCREEN ───────────────────────────────────────────────────────────
     stimuli_obj.end.draw()
