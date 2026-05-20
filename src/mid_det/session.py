@@ -78,7 +78,16 @@ def setup_screen() -> tuple[list[int], visual.Window]:
         monitor=exp_mon,
         units="height",
         color=(-1, -1, -1),
+        waitBlanking=True,
     )
+    # Explicitly enable VSYNC on the pyglet window. On rigs where it works
+    # (e.g., the scanner display), this lets win.getActualFrameRate() succeed,
+    # which in turn enables the one-frame timing compensation in run_response.
+    # Harmless where VSYNC is broken (macOS dev rigs) — flip() still returns,
+    # just without waiting, and the trial loop falls back to no compensation.
+    handle = getattr(win, "winHandle", None)
+    if handle is not None and hasattr(handle, "set_vsync"):
+        handle.set_vsync(True)
     return win_res, win
 
 

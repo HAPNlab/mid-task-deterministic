@@ -31,8 +31,17 @@ def run() -> None:
 
     win_res, win = session.setup_screen()
 
+    # PsychoPy returns None when it can't get a stable measurement (typically a
+    # sign that VSYNC isn't working on this system). Propagate that — don't
+    # silently fall back to an assumed rate, because downstream code that uses
+    # frame_dur_s for timing compensation would then be working from a guess.
     measured_fps = win.getActualFrameRate()
-    frame_rate = measured_fps if (measured_fps is not None and measured_fps < 200) else 60.0
+    if measured_fps is not None and 30.0 <= measured_fps <= 200.0:
+        frame_rate: float | None = measured_fps
+        frame_dur_s: float | None = 1.0 / measured_fps
+    else:
+        frame_rate = None
+        frame_dur_s = None
 
     # ── LOGGING ──────────────────────────────────────────────────────────────
     data_dir = Path("data")
@@ -46,9 +55,20 @@ def run() -> None:
         f"[bold]Session:[/bold] subject=[cyan]{session_info.subject_id}[/cyan]  "
         f"run=[cyan]{session_info.run_n}[/cyan]  fmri=[cyan]{session_info.fmri}[/cyan]"
     )
-    rcon.print(f"[bold]Frame rate:[/bold] {frame_rate:.1f} Hz")
-    logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
-    logging.exp(f"Frame rate: {frame_rate:.1f} Hz")
+    if frame_rate is not None:
+        rcon.print(
+            f"[bold]Frame rate:[/bold] {frame_rate:.2f} Hz  "
+            f"(frame period [cyan]{frame_dur_s * 1000:.3f} ms[/cyan])"
+        )
+        logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
+        logging.exp(f"Frame rate: {frame_rate:.2f} Hz  (frame period {frame_dur_s * 1000:.3f} ms)")
+    else:
+        rcon.print(
+            "[bold yellow]Frame rate:[/bold yellow] could not be measured "
+            "(VSYNC likely not working — one-frame timing compensation disabled)"
+        )
+        logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
+        logging.exp("Frame rate: unknown (getActualFrameRate returned None or out-of-range)")
 
     # ── BUILD STIMULI ────────────────────────────────────────────────────────
     stimuli_obj = display.build_stimuli(win)
@@ -158,6 +178,7 @@ def run() -> None:
                 pulse_ct=pulse_ct,
                 pulse_counter=pulse_counter,
                 calibration=calibration,
+                frame_dur_s=frame_dur_s,
                 on_response=view.on_response,
                 on_outcome=view.on_outcome,
             )

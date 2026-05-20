@@ -63,6 +63,7 @@ def run_response(
     kb: keyboard.Keyboard,
     jitter_s: float,
     target_dur_s: float,
+    frame_dur_s: float | None,
     early_press: bool,
 ) -> tuple[bool, float | None, bool, float | None]:
     """
@@ -72,6 +73,7 @@ def run_response(
     """
     phase_clock = core.Clock()
     target_shown = False
+    target_onset_flip_done = False
     target_removed_at: float | None = None
     clock_reset_scheduled = False
     hit = False
@@ -79,6 +81,15 @@ def run_response(
 
     # Clear stale key events before the phase begins
     kb.clearEvents()
+
+    # Removal threshold: subtract one frame so the post-flip target_removed_at
+    # lands near target_dur_s instead of one frame above it. If frame_dur_s is
+    # None (VSYNC measurement failed), skip the compensation — better to overshoot
+    # by ~one frame than to subtract a guessed value.
+    if frame_dur_s is not None:
+        remove_threshold_s = max(0.0, target_dur_s - frame_dur_s)
+    else:
+        remove_threshold_s = target_dur_s
 
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
         t = phase_clock.getTime()
@@ -89,7 +100,11 @@ def run_response(
             clock_reset_scheduled = True
             target_shown = True
 
-        should_remove = target_removed_at is None and (t - jitter_s) >= target_dur_s
+        should_remove = (
+            target_removed_at is None
+            and target_onset_flip_done
+            and kb.clock.getTime() >= remove_threshold_s
+        )
 
         # Draw before flip: omitting draw_target when should_remove clears the target on this flip
         if target_shown and target_removed_at is None and not should_remove:
@@ -101,6 +116,8 @@ def run_response(
         # Timestamp after flip so it reflects when the target actually left the screen
         if should_remove:
             target_removed_at = kb.clock.getTime()
+        elif clock_reset_scheduled and not target_onset_flip_done:
+            target_onset_flip_done = True
 
         # Poll keys after flip so timestamps are relative to the most recent screen state
         if not target_shown and not early_press:
@@ -202,6 +219,7 @@ def run_trial(
     pulse_ct: int,
     pulse_counter: PulseCounter,
     calibration: CalibrationState,
+    frame_dur_s: float | None,
     on_response: Callable[[bool, float | None, bool, int, float | str], None] | None = None,
     on_outcome: Callable[[str, int, bool], None] | None = None,
 ) -> tuple[TrialRecord, list[ScanPhase], float, int]:
@@ -266,7 +284,7 @@ def run_trial(
         pulse_ct=pulse_ct,
     ))
     hit, rt_s, early_press, target_removed_at = run_response(
-        win, stimuli, kb, jitter_s, target_dur_s, early_press
+        win, stimuli, kb, jitter_s, target_dur_s, frame_dur_s, early_press
     )
     nominal_time += config.STUDY_TIMES_S["response"]
     target_dur_ms_actual = round(target_removed_at * 1000, 2) if target_removed_at is not None else ""

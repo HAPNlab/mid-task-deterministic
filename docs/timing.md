@@ -6,17 +6,35 @@ The hit/miss criterion is **"key pressed while target is visually displayed"**, 
 
 ### How removal works (`trial.py:run_response`)
 
-At the top of each loop iteration, `t = phase_clock.getTime()` is captured. The target is removed (not drawn) on the iteration where `(t - jitter_s) >= target_dur_s`. Because `t` is the **frame start** time, the target stays on screen through the flip of that last frame and remains visible until the *next* flip.
+Removal is gated on a clock reading against the keyboard clock, which is reset on the target-onset flip:
 
-At 60 Hz (16.67 ms/frame), a `target_dur_ms = 325` target is displayed for:
-
+```python
+should_remove = (
+    target_removed_at is None
+    and target_onset_flip_done
+    and kb.clock.getTime() >= target_dur_s - frame_dur_s
+)
 ```
-ceil(325 / 16.67) × 16.67 ≈ 333 ms  (20 frames)
-```
 
-So `rt_ms` values up to ~333 ms can legitimately be hits for a 325 ms target — the participant responded while the target was still physically on screen.
+The threshold is reduced by `frame_dur_s` (`1.0 / frame_rate`) because `win.flip()` blocks until the next VSYNC after the check — the post-flip timestamp lands ~one frame above whatever the threshold was. Subtracting up front makes `target_dur_ms_actual` land near `target_dur_ms` rather than one frame above it.
 
-### Why this can't be solved in software
+`frame_dur_s` is computed at session start from `win.getActualFrameRate()`. If PsychoPy can't get a stable measurement (it returns `None`, or a value outside 30–200 Hz), `frame_dur_s` stays `None` and the compensation is skipped — `target_dur_ms_actual` will overshoot by ~one frame, but at least it's not corrupted by a guessed frame period. The console prints a warning so you notice. This typically indicates VSYNC isn't working (common on macOS dev rigs); on a properly VSYNC'd scanner display the measurement succeeds and compensation kicks in.
+
+### Why a clock-based check (and not frame counting)
+
+A frame-counting implementation — drawing the target for exactly `round(target_dur_s / frame_dur_s)` flips — is conceptually cleaner and produces deterministically frame-quantized durations, but it requires that `win.flip()` actually blocks on VSYNC. On macOS we observed runs where `flip()` returned without waiting for the vertical blank (PsychoPy logs "Multiple dropped frames have occurred"), in which case the loop counts "frames" that never made it to the screen. Clock-based gating tolerates this because `kb.clock` advances in real time regardless of what the compositor is doing.
+
+`session.py:setup_screen` still passes `waitBlanking=True` and calls `winHandle.set_vsync(True)` so that the scanner display (where VSYNC is reliable) gets proper frame-accurate timing — but the trial loop does not depend on it.
+
+### History
+
+Earlier iterations of this logic had three problems, each addressed in turn:
+
+1. **Wrong reference point** (`(phase_clock.getTime() − jitter_s) >= target_dur_s`): `kb.clock` is reset at the actual onset flip, not when `phase_clock` crossed `jitter_s`. The offset between those two moments could push the recorded `target_dur_ms_actual` up to ~16 ms *short* of `target_dur_ms`.
+2. **One-frame overshoot**: switching the check to `kb.clock.getTime() >= target_dur_s` removed the undershoot but produced a consistent ~16 ms overshoot from the post-flip frame.
+3. **Frame counting at unknown rate**: subtracting `frame_dur_s` cancelled most of the overshoot, but boundary jitter occasionally bumped trials one frame earlier (11–17 ms outliers). A switch to frame counting fixed the outliers on machines with working VSYNC, but failed catastrophically on macOS dev rigs where VSYNC was silently broken — producing 133 ms durations for a 265 ms target.
+
+### Why this can't be solved in software (frame overshoot)
 
 The frame boundary is the fundamental constraint. Stimulus removal is display-synchronous — the target can only disappear at a VSYNC. At 60 Hz that quantizes all removal times to multiples of 16.67 ms, so there will always be up to one frame of overshoot between `target_dur_ms` and actual display duration. A higher refresh rate monitor reduces this: 120 Hz → ~8 ms max overshoot, 240 Hz → ~4 ms. The hit detection logic correctly reflects this reality by tying the hit/miss decision to the visual state (`target_removed`) rather than a numeric RT threshold.
 
@@ -33,7 +51,7 @@ The frame started before the 325 ms threshold (`t - jitter_s < 325 ms` → `targ
 
 ### What `rt_ms > target_dur_ms` means in the data
 
-It is expected and valid. It reflects the frame-level granularity of display timing: the target can persist for up to one full frame (16.67 ms at 60 Hz) beyond `target_dur_ms`. Any hit with `rt_ms` up to approximately `target_dur_ms + frame_duration` is a response to a stimulus that was visually present.
+It is expected and valid. With one-frame compensation, `target_dur_ms_actual` can be slightly above or below `target_dur_ms` (depending on how `target_dur_s` rounds to the nearest frame), but `target_dur_ms_actual` is always the true cutoff. Any hit with `rt_ms < target_dur_ms_actual` is a response to a stimulus that was visually present.
 
 ---
 
