@@ -99,7 +99,7 @@ def write_manifest(
     run_dir: Path,
     session_info: "SessionInfo",
     session_time: datetime,
-    frame_rate: float | None,
+    frame_rate: float,
     n_trials: int,
 ) -> None:
     from mid_det import __version__
@@ -121,7 +121,7 @@ def write_manifest(
         "fmri": session_info.fmri,
         "show_instructions": session_info.show_instructions,
         "session_time": session_time.isoformat(timespec="seconds"),
-        "frame_rate_hz": round(frame_rate, 3) if frame_rate is not None else None,
+        "frame_rate_hz": round(frame_rate, 3),
         "n_trials": n_trials,
         "study_params": {
             "tr_duration_s": MR_SETTINGS["TR"],

@@ -6,33 +6,36 @@ The hit/miss criterion is **"key pressed while target is visually displayed"**, 
 
 ### How removal works (`trial.py:run_response`)
 
-Removal is gated on a clock reading against the keyboard clock, which is reset on the target-onset flip:
+Removal is **frame-counted**. At session start we measure the refresh rate, compute `n_target_frames = round(target_dur_s / frame_dur_s)`, then draw the target for exactly that many flips and omit it on the next:
 
 ```python
 should_remove = (
     target_removed_at is None
     and target_onset_flip_done
-    and kb.clock.getTime() >= target_dur_s - frame_dur_s
+    and target_frames_drawn >= n_target_frames
 )
 ```
 
-The threshold is reduced by `frame_dur_s` (`1.0 / frame_rate`) because `win.flip()` blocks until the next VSYNC after the check — the post-flip timestamp lands ~one frame above whatever the threshold was. Subtracting up front makes `target_dur_ms_actual` land near `target_dur_ms` rather than one frame above it.
+`target_frames_drawn` starts at 1 on the target-onset flip and increments on every subsequent flip where the target was drawn. As long as `win.flip()` blocks on VSYNC, the target is on-screen for `n_target_frames * frame_dur_s` and `target_dur_ms_actual` (read from `kb.clock` on the removal flip) lands within a few hundred µs of that.
 
-`frame_dur_s` is computed at session start from `win.getActualFrameRate()`. If PsychoPy can't get a stable measurement (it returns `None`, or a value outside 30–200 Hz), `frame_dur_s` stays `None` and the compensation is skipped — `target_dur_ms_actual` will overshoot by ~one frame, but at least it's not corrupted by a guessed frame period. The console prints a warning so you notice. This typically indicates VSYNC isn't working (common on macOS dev rigs); on a properly VSYNC'd scanner display the measurement succeeds and compensation kicks in.
+### Refresh rate must be known at startup
 
-### Why a clock-based check (and not frame counting)
+`frame_dur_s` comes from `win.getActualFrameRate()`. If PsychoPy can't get a stable measurement (returns `None`, or a value outside 30–200 Hz), `__main__.run()` raises `RuntimeError` rather than guessing — a wrong frame period silently corrupts every target duration. The user can override with `--fps <hz>` if they know the refresh rate but VSYNC measurement is broken (e.g. macOS dev rigs, where the Cocoa compositor doesn't honor `set_vsync(True)`).
 
-A frame-counting implementation — drawing the target for exactly `round(target_dur_s / frame_dur_s)` flips — is conceptually cleaner and produces deterministically frame-quantized durations, but it requires that `win.flip()` actually blocks on VSYNC. On macOS we observed runs where `flip()` returned without waiting for the vertical blank (PsychoPy logs "Multiple dropped frames have occurred"), in which case the loop counts "frames" that never made it to the screen. Clock-based gating tolerates this because `kb.clock` advances in real time regardless of what the compositor is doing.
+`session.py:setup_screen` passes `waitBlanking=True` and calls `winHandle.set_vsync(True)` so production Windows rigs flip on VSYNC.
 
-`session.py:setup_screen` still passes `waitBlanking=True` and calls `winHandle.set_vsync(True)` so that the scanner display (where VSYNC is reliable) gets proper frame-accurate timing — but the trial loop does not depend on it.
+### macOS caveat
+
+On macOS, `win.flip()` often returns before the next vertical blank — PsychoPy logs "Multiple dropped frames have occurred" — and frame counting will produce wildly wrong durations (e.g. 133 ms for a 265 ms target). This is a known macOS/Cocoa compositor issue we can't fix in software. Production runs on Windows; macOS is dev-only and, if used, requires passing `--fps` manually with the understanding that recorded durations will not match wall time.
 
 ### History
 
-Earlier iterations of this logic had three problems, each addressed in turn:
+Earlier iterations of this logic went through several problems:
 
 1. **Wrong reference point** (`(phase_clock.getTime() − jitter_s) >= target_dur_s`): `kb.clock` is reset at the actual onset flip, not when `phase_clock` crossed `jitter_s`. The offset between those two moments could push the recorded `target_dur_ms_actual` up to ~16 ms *short* of `target_dur_ms`.
 2. **One-frame overshoot**: switching the check to `kb.clock.getTime() >= target_dur_s` removed the undershoot but produced a consistent ~16 ms overshoot from the post-flip frame.
-3. **Frame counting at unknown rate**: subtracting `frame_dur_s` cancelled most of the overshoot, but boundary jitter occasionally bumped trials one frame earlier (11–17 ms outliers). A switch to frame counting fixed the outliers on machines with working VSYNC, but failed catastrophically on macOS dev rigs where VSYNC was silently broken — producing 133 ms durations for a 265 ms target.
+3. **Boundary jitter outliers**: subtracting `frame_dur_s` from a clock threshold cancelled most of the overshoot, but boundary jitter occasionally bumped trials one frame earlier (11–17 ms outliers).
+4. **Brief detour through a clock-based gate** to tolerate broken macOS VSYNC. Reverted in favor of frame counting once we accepted that production is Windows-only and macOS dev sessions must pass `--fps` explicitly.
 
 ### Why this can't be solved in software (frame overshoot)
 

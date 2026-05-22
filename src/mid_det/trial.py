@@ -66,7 +66,7 @@ def run_response(
     kb: keyboard.Keyboard,
     jitter_s: float,
     target_dur_s: float,
-    frame_dur_s: float | None,
+    frame_dur_s: float,
     early_press: bool,
     overlay: DebugOverlay | None = None,
 ) -> tuple[bool, float | None, bool, float | None]:
@@ -82,18 +82,17 @@ def run_response(
     clock_reset_scheduled = False
     hit = False
     rt_s: float | None = None
+    target_frames_drawn = 0
 
     # Clear stale key events before the phase begins
     kb.clearEvents()
 
-    # Removal threshold: subtract one frame so the post-flip target_removed_at
-    # lands near target_dur_s instead of one frame above it. If frame_dur_s is
-    # None (VSYNC measurement failed), skip the compensation — better to overshoot
-    # by ~one frame than to subtract a guessed value.
-    if frame_dur_s is not None:
-        remove_threshold_s = max(0.0, target_dur_s - frame_dur_s)
-    else:
-        remove_threshold_s = target_dur_s
+    # Frame-count target removal: draw the target for exactly N flips, where N is
+    # the nearest integer number of frames to target_dur_s. Requires win.flip() to
+    # block on VSYNC (true on the Windows production rig). On rigs where VSYNC is
+    # silently broken (macOS), startup will have raised — or the user passed --fps
+    # manually, in which case they own the timing assumption.
+    n_target_frames = round(target_dur_s / frame_dur_s)
 
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
         t = phase_clock.getTime()
@@ -107,7 +106,7 @@ def run_response(
         should_remove = (
             target_removed_at is None
             and target_onset_flip_done
-            and kb.clock.getTime() >= remove_threshold_s
+            and target_frames_drawn >= n_target_frames
         )
 
         # Draw before flip: omitting draw_target when should_remove clears the target on this flip
@@ -122,6 +121,9 @@ def run_response(
             target_removed_at = kb.clock.getTime()
         elif clock_reset_scheduled and not target_onset_flip_done:
             target_onset_flip_done = True
+            target_frames_drawn = 1
+        elif target_onset_flip_done and target_removed_at is None:
+            target_frames_drawn += 1
 
         # Poll keys after flip so timestamps are relative to the most recent screen state
         if not target_shown and not early_press:
@@ -227,7 +229,7 @@ def run_trial(
     pulse_ct: int,
     pulse_counter: PulseCounter,
     calibration: CalibrationState,
-    frame_dur_s: float | None,
+    frame_dur_s: float,
     on_response: Callable[[bool, float | None, bool, int, float | str], None] | None = None,
     on_outcome: Callable[[str, int, bool], None] | None = None,
     overlay: DebugOverlay | None = None,

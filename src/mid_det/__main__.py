@@ -42,21 +42,25 @@ def run() -> None:
     win_res, win = session.setup_screen()
 
     if args.fps is not None:
-        frame_rate: float | None = args.fps
-        frame_dur_s: float | None = 1.0 / args.fps
+        frame_rate: float = args.fps
+        frame_dur_s: float = 1.0 / args.fps
         fps_source = "specified"
     else:
-        # PsychoPy returns None when it can't get a stable measurement (typically a
-        # sign that VSYNC isn't working on this system). Propagate that — don't
-        # silently fall back to an assumed rate, because downstream code that uses
-        # frame_dur_s for timing compensation would then be working from a guess.
+        # Frame-count target removal depends on a known refresh rate. If PsychoPy
+        # can't get a stable measurement (typically a sign VSYNC isn't working —
+        # common on macOS dev rigs), bail out rather than silently degrading: a
+        # guessed rate would corrupt every target duration. Use --fps to override.
         measured_fps = win.getActualFrameRate()
-        if measured_fps is not None and 30.0 <= measured_fps <= 200.0:
-            frame_rate = measured_fps
-            frame_dur_s = 1.0 / measured_fps
-        else:
-            frame_rate = None
-            frame_dur_s = None
+        if measured_fps is None or not (30.0 <= measured_fps <= 200.0):
+            win.close()
+            raise RuntimeError(
+                f"Could not measure a stable refresh rate "
+                f"(getActualFrameRate() returned {measured_fps!r}). "
+                "This usually means VSYNC isn't working on this display. "
+                "Re-run with --fps <hz> (e.g. --fps 60) to specify it manually."
+            )
+        frame_rate = measured_fps
+        frame_dur_s = 1.0 / measured_fps
         fps_source = "measured"
 
     # ── LOGGING ──────────────────────────────────────────────────────────────
@@ -71,21 +75,13 @@ def run() -> None:
         f"[bold]Session:[/bold] subject=[cyan]{session_info.subject_id}[/cyan]  "
         f"run=[cyan]{session_info.run_n}[/cyan]  fmri=[cyan]{session_info.fmri}[/cyan]"
     )
-    if frame_rate is not None:
-        source_tag = "[yellow](manually specified)[/yellow]" if fps_source == "specified" else "(measured)"
-        rcon.print(
-            f"[bold]Frame rate:[/bold] {frame_rate:.2f} Hz  "
-            f"(frame period [cyan]{frame_dur_s * 1000:.3f} ms[/cyan])  {source_tag}"
-        )
-        logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
-        logging.exp(f"Frame rate: {frame_rate:.2f} Hz  (frame period {frame_dur_s * 1000:.3f} ms)  [{fps_source}]")
-    else:
-        rcon.print(
-            "[bold yellow]Frame rate:[/bold yellow] could not be measured "
-            "(VSYNC likely not working — one-frame timing compensation disabled)"
-        )
-        logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
-        logging.exp("Frame rate: unknown (getActualFrameRate returned None or out-of-range)")
+    source_tag = "[yellow](manually specified)[/yellow]" if fps_source == "specified" else "(measured)"
+    rcon.print(
+        f"[bold]Frame rate:[/bold] {frame_rate:.2f} Hz  "
+        f"(frame period [cyan]{frame_dur_s * 1000:.3f} ms[/cyan])  {source_tag}"
+    )
+    logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
+    logging.exp(f"Frame rate: {frame_rate:.2f} Hz  (frame period {frame_dur_s * 1000:.3f} ms)  [{fps_source}]")
 
     # ── BUILD STIMULI ────────────────────────────────────────────────────────
     stimuli_obj = display.build_stimuli(win)
@@ -97,7 +93,7 @@ def run() -> None:
         run_n=session_info.run_n,
         fmri=session_info.fmri,
         frame_rate=frame_rate,
-        frame_dur_ms=frame_dur_s * 1000 if frame_dur_s is not None else None,
+        frame_dur_ms=frame_dur_s * 1000,
     )
     debug_overlay = DebugOverlay(win, debug_state)
     _orig_flip = win.flip
