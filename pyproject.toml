@@ -10,12 +10,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Eric Wang" }]
 dependencies = [
-    "psychopy>=2025.1",
+    "psychopy>=2026.1",
     "scipy>=1.11",
     "numpy>=1.26",
     "pandas>=2.0",
     "rich>=14.3.3",
     "mcculw>=1.0.0",
+    "pyobjc-framework-quartz>=10",
 ]
 
 [project.optional-dependencies]
@@ -26,3 +27,6 @@ mid-task-det = "mid_det.__main__:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.uv.extra-build-dependencies]
+pyobjc-framework-quartz = ["pkg_resources"]
