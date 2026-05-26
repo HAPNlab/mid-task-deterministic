@@ -97,9 +97,11 @@ def run() -> None:
     )
     debug_overlay = DebugOverlay(win, debug_state)
     _orig_flip = win.flip
+
     def _flip_with_overlay(*args, **kwargs):  # noqa: E306
         debug_overlay.draw()
         return _orig_flip(*args, **kwargs)
+
     win.flip = _flip_with_overlay
 
     # ── LOAD SEQUENCE ────────────────────────────────────────────────────────
@@ -135,6 +137,17 @@ def run() -> None:
 
     # ── KEYBOARD & MOUSE ─────────────────────────────────────────────────────
     kb = keyboard.Keyboard()
+    actual_backend = kb.device.getBackend()
+    if actual_backend != "ptb":
+        win.close()
+        raise RuntimeError(
+            f"Keyboard backend is '{actual_backend}', not 'ptb'. "
+            "Install psychtoolbox: pip install psychtoolbox"
+        )
+    # PsychoPy ≥2024.1 defaults muteOutsidePsychopy=True on macOS, silently
+    # dropping all keypresses when isRegisteredApp() returns False (common
+    # when launched from a terminal or IDE). Disable it for experiment use.
+    kb.device.muteOutsidePsychopy = False
     win.mouseVisible = False
 
     # ── INSTRUCTIONS ─────────────────────────────────────────────────────────
