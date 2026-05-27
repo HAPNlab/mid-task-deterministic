@@ -244,11 +244,12 @@ def run() -> None:
             n_hits += rec.hit
             hit_rate = n_hits / n_trials_done * 100
             rt_str = f"{rec.rt_ms:.0f} ms" if rec.rt_ms != "" else "—"
+            win_str = f"{rec.target_dur_ms_actual:.2f} ms" if rec.target_dur_ms_actual != "" else "—"
             result_label = "HIT" if rec.hit else ("early" if rec.early_press else "miss")
 
             logging.exp(
                 f"Trial {trial_n:3d}/{n_trials}  {rec.cue_label:<5}  "
-                f"win={rec.target_dur_ms:3d} ms  {result_label:<5}  RT={rt_str:>6}  "
+                f"win={win_str}  {result_label:<5}  RT={rt_str:>6}  "
                 f"outcome={rec.reward_outcome:>4}  total={f'${rec.total_earned}':>5}  "
                 f"hit_rate={hit_rate:3.0f}%"
             )
