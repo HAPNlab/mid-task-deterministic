@@ -19,7 +19,7 @@ prefs.hardware["keyboardBackend"] = "ptb"
 from psychopy.hardware import keyboard
 from rich.console import Console
 
-from mid_det import config, display, recorder, scanner, sequences, session, trial
+from mid_det import config, display, recorder, scanner, sequences, session, setup_wizard, trial
 from mid_det.calibration import CalibrationState
 from mid_det.console import TrialLiveView
 from mid_det.debug import DebugOverlay, DebugState
@@ -35,10 +35,9 @@ def run() -> None:
     )
     args = parser.parse_args()
 
-    # ── INITIALISE SESSION ───────────────────────────────────────────────────
-    session_info = session.show_dialog()
-    session_time = datetime.now()
-
+    # ── SCREEN & FRAME RATE ──────────────────────────────────────────────────
+    # Open the window first so we have a real frame duration to pass into the
+    # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
     win_res, win = session.setup_screen()
 
     if args.fps is not None:
@@ -62,6 +61,10 @@ def run() -> None:
         frame_rate = measured_fps
         frame_dur_s = 1.0 / measured_fps
         fps_source = "measured"
+
+    # ── SETUP WIZARD ─────────────────────────────────────────────────────────
+    session_info = setup_wizard.run_wizard(frame_dur_s=frame_dur_s)
+    session_time = datetime.now()
 
     # ── LOGGING ──────────────────────────────────────────────────────────────
     data_dir = Path("data")
@@ -111,15 +114,16 @@ def run() -> None:
 
     # ── ADAPTIVE CALIBRATION ────────────────────────────────────────────────
     base_rt_s = session_info.base_rt_s
-    calibration = CalibrationState(base_rt_s=base_rt_s)
+    rt_change_s = session_info.rt_change_s
+    calibration = CalibrationState(base_rt_s=base_rt_s, rt_change_s=rt_change_s)
     rcon.print(
-        f"[bold]Adaptive target window:[/bold] base=[cyan]{int(base_rt_s * 1000)} ms[/cyan]  "
-        f"step=±[cyan]{int(config.RT_CHANGE_S * 1000)} ms[/cyan]  "
+        f"[bold]Adaptive target window:[/bold] base=[cyan]{base_rt_s * 1000:.2f} ms[/cyan]  "
+        f"step=±[cyan]{rt_change_s * 1000:.2f} ms[/cyan]  "
         f"win-ratio threshold=[cyan]{config.WIN_RATIO_THRESHOLD}[/cyan]"
     )
     logging.exp(
-        f"Adaptive target window: base={int(base_rt_s * 1000)} ms  "
-        f"step=±{int(config.RT_CHANGE_S * 1000)} ms  "
+        f"Adaptive target window: base={base_rt_s * 1000:.2f} ms  "
+        f"step=±{rt_change_s * 1000:.2f} ms  "
         f"win-ratio threshold={config.WIN_RATIO_THRESHOLD}"
     )
 

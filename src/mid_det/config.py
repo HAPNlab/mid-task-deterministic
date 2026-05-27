@@ -39,7 +39,7 @@ TRIAL_TYPE_MAP: dict[tuple[str, int], int] = {
 # (harder), otherwise grows it (easier).
 BASE_RT_S: float = 0.265
 BASE_RT_PRACTICE_S: float = 0.400
-RT_CHANGE_S: float = 0.020
+RT_CHANGE_S: float = 0.020          # fallback default; wizard sets it to 1 frame at runtime
 WIN_RATIO_THRESHOLD: float = 0.66
 MIN_TRIALS_FOR_ADAPT: int = 3
 

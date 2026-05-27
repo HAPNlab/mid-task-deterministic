@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pyglet
-from psychopy import core, gui, monitors, visual
+from psychopy import core, monitors, visual
 from psychopy.hardware import keyboard
 
 from mid_det import config
@@ -26,42 +26,7 @@ class SessionInfo:
     run_n: str                 # "1" | "2" | "practice"
     show_instructions: bool
     base_rt_s: float
-
-
-def show_dialog() -> SessionInfo:
-    """Present the startup dialog and return a SessionInfo."""
-    default_base_rt_ms = int(round(config.BASE_RT_S * 1000.0))
-    fields = {
-        "Subject ID": "XXX000",
-        "fMRI? (yes/no)": "no",
-        "Task number (1/2/practice)": "practice",
-        "Show instructions? (yes/no)": "yes",
-        "Baseline RT (ms; 250-280 typical, 400 for practice)": str(default_base_rt_ms),
-    }
-    while True:
-        dlg = gui.DlgFromDict(dictionary=fields, title="MID Task (Deterministic)")
-        if not dlg.OK:
-            core.quit()
-
-        run_n = str(fields["Task number (1/2/practice)"]).strip()
-        base_rt_ms_raw = str(fields["Baseline RT (ms; 250-280 typical, 400 for practice)"]).strip()
-        try:
-            base_rt_ms = float(base_rt_ms_raw)
-        except ValueError:
-            gui.warnDlg(prompt=f"Baseline RT must be a number (got '{base_rt_ms_raw}').")
-            continue
-        if base_rt_ms <= 0:
-            gui.warnDlg(prompt=f"Baseline RT must be > 0 ms (got {base_rt_ms}).")
-            continue
-        break
-
-    return SessionInfo(
-        subject_id=str(fields["Subject ID"]),
-        fmri=fields["fMRI? (yes/no)"].strip().lower() == "yes",
-        run_n=run_n,
-        show_instructions=fields["Show instructions? (yes/no)"].strip().lower() == "yes",
-        base_rt_s=base_rt_ms / 1000.0,
-    )
+    rt_change_s: float = config.RT_CHANGE_S   # staircase step; set by wizard
 
 
 def setup_screen() -> tuple[list[int], visual.Window]:
@@ -80,11 +45,8 @@ def setup_screen() -> tuple[list[int], visual.Window]:
         color=(-1, -1, -1),
         waitBlanking=True,
     )
-    # Explicitly enable VSYNC on the pyglet window. On rigs where it works
-    # (e.g., the scanner display), this lets win.getActualFrameRate() succeed,
-    # which in turn enables the one-frame timing compensation in run_response.
-    # Harmless where VSYNC is broken (macOS dev rigs) — flip() still returns,
-    # just without waiting, and the trial loop falls back to no compensation.
+
+    # Explicitly enable VSYNC on the pyglet window.
     handle = getattr(win, "winHandle", None)
     if handle is not None and hasattr(handle, "set_vsync"):
         handle.set_vsync(True)

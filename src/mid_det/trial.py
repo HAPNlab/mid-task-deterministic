@@ -5,6 +5,7 @@ No rendering objects are built here; no data is written here.
 """
 from __future__ import annotations
 
+import math
 import random
 from collections.abc import Callable
 
@@ -87,11 +88,15 @@ def run_response(
     # Clear stale key events before the phase begins
     kb.clearEvents()
 
-    # Frame-count target removal: draw the target for exactly N flips, where N is
-    # the nearest integer number of frames to target_dur_s. Requires win.flip() to
-    # block on VSYNC (true on the Windows production rig). On rigs where VSYNC is
-    # silently broken (macOS), startup will have raised — or the user passed --fps
-    # manually, in which case they own the timing assumption.
+    # Frame-count target removal: draw the target for exactly N flips.
+    # round() rather than ceil() is intentional: frame-aligned durations (e.g.
+    # 17 * frame_dur) accumulate floating-point drift and evaluate to
+    # 17.000000000000004, which ceil() would promote to 18 — one phantom extra
+    # frame. round() snaps back to the correct integer. For non-frame-aligned
+    # values the difference is at most 0.5 frames either way.
+    # Requires win.flip() to block on VSYNC (true on the Windows production rig).
+    # On rigs where VSYNC is silently broken (macOS), startup will have raised —
+    # or the user passed --fps manually, in which case they own the assumption.
     n_target_frames = round(target_dur_s / frame_dur_s)
 
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
