@@ -64,11 +64,19 @@ def run() -> None:
         frame_rate: float = args.fps
         frame_dur_s: float = 1.0 / args.fps
         fps_source = "specified"
+    elif 1000.0 / 200.0 <= screen_diag.calib_median_ms <= 1000.0 / 30.0:
+        # Prefer the 120-flip VSYNC-calibration median: it's a more reliable
+        # estimator than getActualFrameRate(), and the response loop's
+        # `round(t / frame_dur_s)` termination is sensitive to small drift in
+        # frame_dur_s (see Windows run where 0.5% off triggered off-by-one
+        # iters on long-target trials).
+        frame_dur_s = screen_diag.calib_median_ms / 1000.0
+        frame_rate = 1.0 / frame_dur_s
+        fps_source = "vsync-calibration"
     else:
-        # Frame-count target removal depends on a known refresh rate. If PsychoPy
-        # can't get a stable measurement (typically a sign VSYNC isn't working —
-        # common on macOS dev rigs), bail out rather than silently degrading: a
-        # guessed rate would corrupt every target duration. Use --fps to override.
+        # Fallback: getActualFrameRate(). If that also fails, bail out rather
+        # than silently degrading — a guessed rate would corrupt every target
+        # duration. Use --fps to override.
         measured_fps = win.getActualFrameRate()
         if measured_fps is None or not (30.0 <= measured_fps <= 200.0):
             win.close()
