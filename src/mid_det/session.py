@@ -12,7 +12,7 @@ import platform
 import statistics
 
 import pyglet
-from psychopy import core, logging, monitors, visual
+from psychopy import core, monitors, visual
 from psychopy.hardware import keyboard
 
 from mid_det import config
@@ -32,7 +32,20 @@ class SessionInfo:
     rt_change_s: float = config.RT_CHANGE_S   # staircase step; set by wizard
 
 
-def setup_screen() -> tuple[list[int], visual.Window]:
+@dataclass
+class ScreenDiagnostics:
+    gl_vendor: str
+    gl_renderer: str
+    win_type: str
+    pyglet_version: str
+    platform_str: str
+    calib_median_ms: float
+    calib_p99_ms: float
+    calib_max_ms: float
+    calib_n: int
+
+
+def setup_screen() -> tuple[list[int], visual.Window, ScreenDiagnostics]:
     display = pyglet.canvas.get_display()
     screens = display.get_screens()
     win_res = [screens[-1].width, screens[-1].height]
@@ -54,24 +67,20 @@ def setup_screen() -> tuple[list[int], visual.Window]:
     if handle is not None and hasattr(handle, "set_vsync"):
         handle.set_vsync(True)
 
-    # Log backend so timing spikes can be correlated with driver/compositor.
+    # Collect backend identifiers so timing spikes can be correlated with
+    # driver/compositor in post-hoc analysis.
     try:
         gl_info = pyglet.gl.current_context.get_info()
-        logging.exp(
-            f"GL vendor={gl_info.get_vendor()}  "
-            f"renderer={gl_info.get_renderer()}  "
-            f"winType={getattr(win, 'winType', '?')}  "
-            f"pyglet={getattr(pyglet, 'version', '?')}  "
-            f"platform={platform.platform()}"
-        )
-    except Exception as exc:  # noqa: BLE001 — diagnostic only
-        logging.warning(f"Could not query GL backend info: {exc}")
+        gl_vendor = gl_info.get_vendor()
+        gl_renderer = gl_info.get_renderer()
+    except Exception:  # noqa: BLE001 — diagnostic only
+        gl_vendor = "?"
+        gl_renderer = "?"
 
-    # VSYNC calibration: flip ~120 times and report interval stats. If the 99th
+    # VSYNC calibration: flip ~120 times and measure intervals. If the 99th
     # percentile is well above one frame period, vsync is not actually blocking
     # — typical on Windows under DWM composition or borderless fullscreen.
     intervals_ms: list[float] = []
-    last_t = core.getTime()
     win.flip()  # warm-up; first interval after a stale context can be misleading
     last_t = core.getTime()
     for _ in range(120):
@@ -83,18 +92,25 @@ def setup_screen() -> tuple[list[int], visual.Window]:
     median = statistics.median(intervals_ms)
     p99 = intervals_ms[int(0.99 * len(intervals_ms)) - 1]
     mx = intervals_ms[-1]
-    logging.exp(
-        f"VSYNC calibration: median={median:.3f} ms  "
-        f"p99={p99:.3f} ms  max={mx:.3f} ms  (n={len(intervals_ms)})"
-    )
 
     # Enable PsychoPy's frame interval recording so trial.run_response can read
     # win.nDroppedFrames and isolate on-screen drops from measurement artefacts.
-    refresh_threshold_s = (median / 1000.0) * 1.5
-    win.refreshThreshold = refresh_threshold_s
+    win.refreshThreshold = (median / 1000.0) * 1.5
     win.recordFrameIntervals = True
 
-    return win_res, win
+    diagnostics = ScreenDiagnostics(
+        gl_vendor=gl_vendor,
+        gl_renderer=gl_renderer,
+        win_type=str(getattr(win, "winType", "?")),
+        pyglet_version=str(getattr(pyglet, "version", "?")),
+        platform_str=platform.platform(),
+        calib_median_ms=round(median, 3),
+        calib_p99_ms=round(p99, 3),
+        calib_max_ms=round(mx, 3),
+        calib_n=len(intervals_ms),
+    )
+
+    return win_res, win, diagnostics
 
 
 def make_run_dir(data_dir: Path, session_info: SessionInfo, session_time: datetime) -> Path:

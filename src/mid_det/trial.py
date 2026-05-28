@@ -88,7 +88,9 @@ def run_response(
     onset_flip_return_t: float | None = None
     removal_flip_return_t: float | None = None
     flip_iters = 0
-    dropped_at_start = getattr(win, "nDroppedFrames", 0)
+    dropped_at_onset: int | None = None
+    max_intra_flip_ms = 0.0
+    last_intra_flip_t: float | None = None
 
     # Clear stale key events before the phase begins
     kb.clearEvents()
@@ -139,9 +141,17 @@ def run_response(
         elif clock_reset_scheduled and not target_onset_flip_done:
             target_onset_flip_done = True
             onset_flip_return_t = core.getTime()
+            dropped_at_onset = getattr(win, "nDroppedFrames", 0)
+            last_intra_flip_t = onset_flip_return_t
 
         if target_onset_flip_done and target_removed_at is None:
             flip_iters += 1
+            now = core.getTime()
+            if last_intra_flip_t is not None:
+                delta_ms = (now - last_intra_flip_t) * 1000
+                if delta_ms > max_intra_flip_ms:
+                    max_intra_flip_ms = delta_ms
+            last_intra_flip_t = now
 
         # Poll keys after flip so timestamps are relative to the most recent screen state
         if not target_shown and not early_press:
@@ -171,13 +181,17 @@ def run_response(
     else:
         onset_to_removal_wall_ms = ""
 
-    dropped_frames = getattr(win, "nDroppedFrames", 0) - dropped_at_start
+    if dropped_at_onset is not None:
+        dropped_frames = int(getattr(win, "nDroppedFrames", 0) - dropped_at_onset)
+    else:
+        dropped_frames = 0
 
     diagnostics = {
         "flip_iters": flip_iters,
         "n_target_frames": n_target_frames,
-        "dropped_frames": int(dropped_frames),
+        "dropped_frames": dropped_frames,
         "onset_to_removal_wall_ms": onset_to_removal_wall_ms,
+        "max_flip_interval_ms": round(max_intra_flip_ms, 2),
     }
 
     return hit, rt_s, early_press, target_removed_at, diagnostics
@@ -420,6 +434,7 @@ def run_trial(
         n_target_frames=response_diag["n_target_frames"],
         dropped_frames=response_diag["dropped_frames"],
         onset_to_removal_wall_ms=response_diag["onset_to_removal_wall_ms"],
+        max_flip_interval_ms=response_diag["max_flip_interval_ms"],
     )
 
     if overlay is not None:

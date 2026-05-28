@@ -42,6 +42,7 @@ class TrialRecord:
     n_target_frames: int
     dropped_frames: int
     onset_to_removal_wall_ms: float | str
+    max_flip_interval_ms: float
 
 
 @dataclass
@@ -61,6 +62,7 @@ BEHAVIORAL_COLUMNS: list[str] = [
     "time_sched_end", "timing_drift_ms", "total_trs", "subject_id", "run_n",
     "pulse_ct",
     "flip_iters", "n_target_frames", "dropped_frames", "onset_to_removal_wall_ms",
+    "max_flip_interval_ms",
 ]
 
 SCAN_LOG_COLUMNS: list[str] = [

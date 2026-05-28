@@ -38,7 +38,7 @@ def run() -> None:
     # ── SCREEN & FRAME RATE ──────────────────────────────────────────────────
     # Open the window first so we have a real frame duration to pass into the
     # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
-    win_res, win = session.setup_screen()
+    win_res, win, screen_diag = session.setup_screen()
 
     if args.fps is not None:
         frame_rate: float = args.fps
@@ -85,6 +85,16 @@ def run() -> None:
     )
     logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
     logging.exp(f"Frame rate: {frame_rate:.2f} Hz  (frame period {frame_dur_s * 1000:.3f} ms)  [{fps_source}]")
+    logging.exp(
+        f"GL vendor={screen_diag.gl_vendor}  renderer={screen_diag.gl_renderer}  "
+        f"winType={screen_diag.win_type}  pyglet={screen_diag.pyglet_version}  "
+        f"platform={screen_diag.platform_str}"
+    )
+    logging.exp(
+        f"VSYNC calibration: median={screen_diag.calib_median_ms:.3f} ms  "
+        f"p99={screen_diag.calib_p99_ms:.3f} ms  max={screen_diag.calib_max_ms:.3f} ms  "
+        f"(n={screen_diag.calib_n})"
+    )
 
     # ── BUILD STIMULI ────────────────────────────────────────────────────────
     stimuli_obj = display.build_stimuli(win)
