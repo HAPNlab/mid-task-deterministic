@@ -52,13 +52,19 @@ def run_fixation(
 ) -> bool:
     """Display fixation; return True if any response key was pressed (early press)."""
     kb.clearEvents()
+    early = False
     timer = core.CountdownTimer(config.STUDY_TIMES_S["fixation"])
     while timer.getTime() > 0:
         draw_fixation_x(stimuli)
         win.flip()
         _check_quit(kb, overlay)
-    keys = kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False)
-    return len(keys) > 0
+        # Poll in the loop so a press doesn't sit in the buffer until end-of-phase,
+        # where a downstream kb.clearEvents() could discard it before inspection.
+        if not early and kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
+            early = True
+    if not early and kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
+        early = True
+    return early
 
 
 def run_response(
@@ -84,16 +90,23 @@ def run_response(
     hit = False
     rt_s: float | None = None
 
-    # Diagnostics: distinguish on-screen drops from post-flip measurement noise.
-    onset_flip_return_t: float | None = None
-    removal_flip_return_t: float | None = None
+    # Measurement: use win.lastFrameT (the time PsychoPy stamps inside flip(),
+    # right after glFinish but before callOnFlip callbacks fire). This is a
+    # tighter proxy for the actual swap time than reading core.getTime() after
+    # flip() returns, which additionally absorbs callback-dispatch overhead.
+    onset_flip_t: float | None = None
+    removal_flip_t: float | None = None
     flip_iters = 0
     dropped_at_onset: int | None = None
     max_intra_flip_ms = 0.0
     last_intra_flip_t: float | None = None
 
-    # Clear stale key events before the phase begins
-    kb.clearEvents()
+    # Drain any presses queued between fixation end and now (e.g. during
+    # pulse_counter.wait_for_tr() or scheduler hiccups). Any EXP_KEYS press
+    # observed here belongs to the pre-target window and must count as early.
+    # Plain kb.clearEvents() would silently discard these.
+    if kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
+        early_press = True
 
     # Derive frames-shown from kb.clock (reset on the onset flip) rather than
     # counting loop iterations. Counting iterations assumes every flip() blocks
@@ -134,19 +147,21 @@ def run_response(
             draw_fixation_x(stimuli)
         win.flip()
 
-        # Timestamp after flip so it reflects when the target actually left the screen
+        # Timestamp using win.lastFrameT, which PsychoPy sets inside flip()
+        # right after the GPU finishes the swap. core.getTime() after flip()
+        # returns would additionally include callOnFlip callback overhead.
         if should_remove:
-            target_removed_at = kb.clock.getTime()
-            removal_flip_return_t = core.getTime()
+            removal_flip_t = win.lastFrameT
+            target_removed_at = removal_flip_t - onset_flip_t if onset_flip_t else None
         elif clock_reset_scheduled and not target_onset_flip_done:
             target_onset_flip_done = True
-            onset_flip_return_t = core.getTime()
+            onset_flip_t = win.lastFrameT
             dropped_at_onset = getattr(win, "nDroppedFrames", 0)
-            last_intra_flip_t = onset_flip_return_t
+            last_intra_flip_t = onset_flip_t
 
         if target_onset_flip_done and target_removed_at is None:
             flip_iters += 1
-            now = core.getTime()
+            now = win.lastFrameT
             if last_intra_flip_t is not None:
                 delta_ms = (now - last_intra_flip_t) * 1000
                 if delta_ms > max_intra_flip_ms:
@@ -171,12 +186,9 @@ def run_response(
 
         _check_quit(kb, overlay)
 
-    if (
-        onset_flip_return_t is not None
-        and removal_flip_return_t is not None
-    ):
+    if onset_flip_t is not None and removal_flip_t is not None:
         onset_to_removal_wall_ms = round(
-            (removal_flip_return_t - onset_flip_return_t) * 1000, 2
+            (removal_flip_t - onset_flip_t) * 1000, 2
         )
     else:
         onset_to_removal_wall_ms = ""
