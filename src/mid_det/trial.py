@@ -83,20 +83,21 @@ def run_response(
     clock_reset_scheduled = False
     hit = False
     rt_s: float | None = None
-    target_frames_drawn = 0
 
     # Clear stale key events before the phase begins
     kb.clearEvents()
 
-    # Frame-count target removal: draw the target for exactly N flips.
+    # Derive frames-shown from kb.clock (reset on the onset flip) rather than
+    # counting loop iterations. Counting iterations assumes every flip() blocks
+    # exactly one vsync — true on macOS once VSYNC is verified, but Windows
+    # occasionally drops a frame, making one flip() span two vsyncs. The
+    # iteration counter would still tick once and the target would be visible
+    # for one extra frame. The clock advances with real wall time regardless,
+    # so round(elapsed / frame_dur) + 1 reflects actual displayed frames.
     # round() rather than ceil() is intentional: frame-aligned durations (e.g.
     # 17 * frame_dur) accumulate floating-point drift and evaluate to
     # 17.000000000000004, which ceil() would promote to 18 — one phantom extra
-    # frame. round() snaps back to the correct integer. For non-frame-aligned
-    # values the difference is at most 0.5 frames either way.
-    # Requires win.flip() to block on VSYNC (true on the Windows production rig).
-    # On rigs where VSYNC is silently broken (macOS), startup will have raised —
-    # or the user passed --fps manually, in which case they own the assumption.
+    # frame. round() snaps back to the correct integer.
     n_target_frames = round(target_dur_s / frame_dur_s)
 
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
@@ -108,10 +109,14 @@ def run_response(
             clock_reset_scheduled = True
             target_shown = True
 
+        if target_onset_flip_done and target_removed_at is None:
+            frames_shown = round(kb.clock.getTime() / frame_dur_s) + 1
+        else:
+            frames_shown = 0
         should_remove = (
             target_removed_at is None
             and target_onset_flip_done
-            and target_frames_drawn >= n_target_frames
+            and frames_shown >= n_target_frames
         )
 
         # Draw before flip: omitting draw_target when should_remove clears the target on this flip
@@ -126,9 +131,6 @@ def run_response(
             target_removed_at = kb.clock.getTime()
         elif clock_reset_scheduled and not target_onset_flip_done:
             target_onset_flip_done = True
-            target_frames_drawn = 1
-        elif target_onset_flip_done and target_removed_at is None:
-            target_frames_drawn += 1
 
         # Poll keys after flip so timestamps are relative to the most recent screen state
         if not target_shown and not early_press:
