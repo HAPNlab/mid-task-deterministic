@@ -48,6 +48,7 @@ def test_behavioral_csv_roundtrip(tmp_path: Path):
         subject_id="X", run_n="1", pulse_ct=0,
         flip_iters=16, n_target_frames=16, dropped_frames=0,
         onset_to_removal_wall_ms=266.67, max_flip_interval_ms=16.7,
+        trial_clean=1,
     )
     w.append(rec)
     w.close()

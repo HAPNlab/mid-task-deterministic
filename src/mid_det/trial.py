@@ -153,6 +153,13 @@ def run_response(
         if should_remove:
             removal_flip_t = win.lastFrameT
             target_removed_at = removal_flip_t - onset_flip_t if onset_flip_t else None
+            # Also measure the interval into the removal flip — a stretched
+            # removal flip is exactly the DWM-hiccup signature and must not be
+            # invisible to the diagnostic.
+            if last_intra_flip_t is not None:
+                delta_ms = (removal_flip_t - last_intra_flip_t) * 1000
+                if delta_ms > max_intra_flip_ms:
+                    max_intra_flip_ms = delta_ms
         elif clock_reset_scheduled and not target_onset_flip_done:
             target_onset_flip_done = True
             onset_flip_t = win.lastFrameT
@@ -198,12 +205,27 @@ def run_response(
     else:
         dropped_frames = 0
 
+    # Mark trial unclean if (a) PsychoPy detected any dropped frames during the
+    # response window, OR (b) the measured wall delta differs from the expected
+    # on-screen duration by more than half a frame. Either condition makes the
+    # exact target-display time unreliable for timing-sensitive analyses; flag
+    # for exclusion at analysis time. DWM-induced extra frames on Windows are
+    # an acknowledged unsolvable limitation — exclusion is the standard fix.
+    expected_dur_ms = n_target_frames * frame_dur_s * 1000
+    half_frame_ms = (frame_dur_s * 1000) / 2
+    timing_off_by_frame = (
+        isinstance(onset_to_removal_wall_ms, (int, float))
+        and abs(onset_to_removal_wall_ms - expected_dur_ms) > half_frame_ms
+    )
+    trial_clean = dropped_frames == 0 and not timing_off_by_frame
+
     diagnostics = {
         "flip_iters": flip_iters,
         "n_target_frames": n_target_frames,
         "dropped_frames": dropped_frames,
         "onset_to_removal_wall_ms": onset_to_removal_wall_ms,
         "max_flip_interval_ms": round(max_intra_flip_ms, 2),
+        "trial_clean": trial_clean,
     }
 
     return hit, rt_s, early_press, target_removed_at, diagnostics
@@ -447,6 +469,7 @@ def run_trial(
         dropped_frames=response_diag["dropped_frames"],
         onset_to_removal_wall_ms=response_diag["onset_to_removal_wall_ms"],
         max_flip_interval_ms=response_diag["max_flip_interval_ms"],
+        trial_clean=int(response_diag["trial_clean"]),
     )
 
     if overlay is not None:
