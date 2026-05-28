@@ -38,6 +38,10 @@ class TrialRecord:
     subject_id: str
     run_n: str
     pulse_ct: int
+    flip_iters: int
+    n_target_frames: int
+    dropped_frames: int
+    onset_to_removal_wall_ms: float | str
 
 
 @dataclass
@@ -56,6 +60,7 @@ BEHAVIORAL_COLUMNS: list[str] = [
     "reward_outcome", "total_earned", "time_trial_end", "trial_dur_ms",
     "time_sched_end", "timing_drift_ms", "total_trs", "subject_id", "run_n",
     "pulse_ct",
+    "flip_iters", "n_target_frames", "dropped_frames", "onset_to_removal_wall_ms",
 ]
 
 SCAN_LOG_COLUMNS: list[str] = [

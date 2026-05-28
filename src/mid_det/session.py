@@ -8,8 +8,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import platform
+import statistics
+
 import pyglet
-from psychopy import core, monitors, visual
+from psychopy import core, logging, monitors, visual
 from psychopy.hardware import keyboard
 
 from mid_det import config
@@ -50,6 +53,47 @@ def setup_screen() -> tuple[list[int], visual.Window]:
     handle = getattr(win, "winHandle", None)
     if handle is not None and hasattr(handle, "set_vsync"):
         handle.set_vsync(True)
+
+    # Log backend so timing spikes can be correlated with driver/compositor.
+    try:
+        gl_info = pyglet.gl.current_context.get_info()
+        logging.exp(
+            f"GL vendor={gl_info.get_vendor()}  "
+            f"renderer={gl_info.get_renderer()}  "
+            f"winType={getattr(win, 'winType', '?')}  "
+            f"pyglet={getattr(pyglet, 'version', '?')}  "
+            f"platform={platform.platform()}"
+        )
+    except Exception as exc:  # noqa: BLE001 — diagnostic only
+        logging.warning(f"Could not query GL backend info: {exc}")
+
+    # VSYNC calibration: flip ~120 times and report interval stats. If the 99th
+    # percentile is well above one frame period, vsync is not actually blocking
+    # — typical on Windows under DWM composition or borderless fullscreen.
+    intervals_ms: list[float] = []
+    last_t = core.getTime()
+    win.flip()  # warm-up; first interval after a stale context can be misleading
+    last_t = core.getTime()
+    for _ in range(120):
+        win.flip()
+        now = core.getTime()
+        intervals_ms.append((now - last_t) * 1000)
+        last_t = now
+    intervals_ms.sort()
+    median = statistics.median(intervals_ms)
+    p99 = intervals_ms[int(0.99 * len(intervals_ms)) - 1]
+    mx = intervals_ms[-1]
+    logging.exp(
+        f"VSYNC calibration: median={median:.3f} ms  "
+        f"p99={p99:.3f} ms  max={mx:.3f} ms  (n={len(intervals_ms)})"
+    )
+
+    # Enable PsychoPy's frame interval recording so trial.run_response can read
+    # win.nDroppedFrames and isolate on-screen drops from measurement artefacts.
+    refresh_threshold_s = (median / 1000.0) * 1.5
+    win.refreshThreshold = refresh_threshold_s
+    win.recordFrameIntervals = True
+
     return win_res, win
 
 

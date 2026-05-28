@@ -70,11 +70,11 @@ def run_response(
     frame_dur_s: float,
     early_press: bool,
     overlay: DebugOverlay | None = None,
-) -> tuple[bool, float | None, bool, float | None]:
+) -> tuple[bool, float | None, bool, float | None, dict]:
     """
     Display response phase (STUDY_TIMES_S['response'] seconds total).
     Target appears after jitter_s and stays visible for target_dur_s seconds.
-    Returns (hit, rt_s, early_press, target_removed_at).
+    Returns (hit, rt_s, early_press, target_removed_at, diagnostics).
     """
     phase_clock = core.Clock()
     target_shown = False
@@ -83,6 +83,12 @@ def run_response(
     clock_reset_scheduled = False
     hit = False
     rt_s: float | None = None
+
+    # Diagnostics: distinguish on-screen drops from post-flip measurement noise.
+    onset_flip_return_t: float | None = None
+    removal_flip_return_t: float | None = None
+    flip_iters = 0
+    dropped_at_start = getattr(win, "nDroppedFrames", 0)
 
     # Clear stale key events before the phase begins
     kb.clearEvents()
@@ -129,8 +135,13 @@ def run_response(
         # Timestamp after flip so it reflects when the target actually left the screen
         if should_remove:
             target_removed_at = kb.clock.getTime()
+            removal_flip_return_t = core.getTime()
         elif clock_reset_scheduled and not target_onset_flip_done:
             target_onset_flip_done = True
+            onset_flip_return_t = core.getTime()
+
+        if target_onset_flip_done and target_removed_at is None:
+            flip_iters += 1
 
         # Poll keys after flip so timestamps are relative to the most recent screen state
         if not target_shown and not early_press:
@@ -150,7 +161,26 @@ def run_response(
 
         _check_quit(kb, overlay)
 
-    return hit, rt_s, early_press, target_removed_at
+    if (
+        onset_flip_return_t is not None
+        and removal_flip_return_t is not None
+    ):
+        onset_to_removal_wall_ms = round(
+            (removal_flip_return_t - onset_flip_return_t) * 1000, 2
+        )
+    else:
+        onset_to_removal_wall_ms = ""
+
+    dropped_frames = getattr(win, "nDroppedFrames", 0) - dropped_at_start
+
+    diagnostics = {
+        "flip_iters": flip_iters,
+        "n_target_frames": n_target_frames,
+        "dropped_frames": int(dropped_frames),
+        "onset_to_removal_wall_ms": onset_to_removal_wall_ms,
+    }
+
+    return hit, rt_s, early_press, target_removed_at, diagnostics
 
 
 def _compute_reward(
@@ -315,7 +345,7 @@ def run_trial(
         pulse_ct=pulse_ct,
     ))
     _update_overlay("response")
-    hit, rt_s, early_press, target_removed_at = run_response(
+    hit, rt_s, early_press, target_removed_at, response_diag = run_response(
         win, stimuli, kb, jitter_s, target_dur_s, frame_dur_s, early_press, overlay
     )
     nominal_time += config.STUDY_TIMES_S["response"]
@@ -386,6 +416,10 @@ def run_trial(
         subject_id=subject_id,
         run_n=run_n,
         pulse_ct=scan_phases[0].pulse_ct,
+        flip_iters=response_diag["flip_iters"],
+        n_target_frames=response_diag["n_target_frames"],
+        dropped_frames=response_diag["dropped_frames"],
+        onset_to_removal_wall_ms=response_diag["onset_to_removal_wall_ms"],
     )
 
     if overlay is not None:
