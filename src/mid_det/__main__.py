@@ -4,6 +4,7 @@ Wires all modules together.
 """
 from __future__ import annotations
 
+import platform
 from datetime import datetime
 from pathlib import Path
 
@@ -25,7 +26,26 @@ from mid_det.console import TrialLiveView
 from mid_det.debug import DebugOverlay, DebugState
 
 
+def _raise_process_priority() -> str | None:
+    """Bump this process to high priority on Windows to reduce scheduler-induced
+    vsync stretches. Returns a short status string for the log, or None if not
+    applicable / unavailable."""
+    if platform.system() != "Windows":
+        return None
+    try:
+        import ctypes
+        HIGH_PRIORITY_CLASS = 0x00000080
+        handle = ctypes.windll.kernel32.GetCurrentProcess()
+        if ctypes.windll.kernel32.SetPriorityClass(handle, HIGH_PRIORITY_CLASS):
+            return "HIGH_PRIORITY_CLASS"
+        return f"SetPriorityClass failed (GetLastError={ctypes.windll.kernel32.GetLastError()})"
+    except Exception as e:
+        return f"unavailable ({e!r})"
+
+
 def run() -> None:
+    priority_status = _raise_process_priority()
+
     import argparse
     parser = argparse.ArgumentParser(prog="mid-task-det")
     parser.add_argument(
@@ -95,6 +115,8 @@ def run() -> None:
         f"p99={screen_diag.calib_p99_ms:.3f} ms  max={screen_diag.calib_max_ms:.3f} ms  "
         f"(n={screen_diag.calib_n})"
     )
+    if priority_status is not None:
+        logging.exp(f"Process priority: {priority_status}")
 
     # ── BUILD STIMULI ────────────────────────────────────────────────────────
     stimuli_obj = display.build_stimuli(win)
