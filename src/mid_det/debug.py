@@ -53,6 +53,7 @@ class DebugOverlay:
 
     def toggle(self) -> None:
         self.enabled = not self.enabled
+        print(f"[DEBUG] overlay {'ON' if self.enabled else 'OFF'}", flush=True)
 
     def draw(self) -> None:
         if not self.enabled:

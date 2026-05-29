@@ -242,7 +242,7 @@ def run() -> None:
     while global_clock.getTime() < t_fix_end:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if kb.getKeys(keyList=["grave"], waitRelease=False):
+        if kb.getKeys(keyList=["f3"], waitRelease=False):
             debug_overlay.toggle()
 
     nominal_time = global_clock.getTime()
@@ -323,7 +323,7 @@ def run() -> None:
     while global_clock.getTime() < t_close_start + leadout_s:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if kb.getKeys(keyList=["grave"], waitRelease=False):
+        if kb.getKeys(keyList=["f3"], waitRelease=False):
             debug_overlay.toggle()
 
     # ── END SCREEN ───────────────────────────────────────────────────────────
