@@ -60,6 +60,11 @@ def run() -> None:
     # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
     win_res, win, screen_diag = session.setup_screen()
 
+    # Warm-up flips before frame-rate measurement: PsychoPy's detectingFrameDrops
+    # doc notes drops are common during startup as the GPU/driver settle.
+    for _ in range(30):
+        win.flip()
+
     if args.fps is not None:
         frame_rate: float = args.fps
         frame_dur_s: float = 1.0 / args.fps
@@ -125,6 +130,11 @@ def run() -> None:
     )
     if priority_status is not None:
         logging.exp(f"Process priority: {priority_status}")
+
+    # Enable per-flip interval recording for post-hoc dropped-frame analysis.
+    # 1.2 * frame period is the PsychoPy-documented default threshold.
+    win.refreshThreshold = frame_dur_s * 1.2
+    win.recordFrameIntervals = True
 
     # ── BUILD STIMULI ────────────────────────────────────────────────────────
     stimuli_obj = display.build_stimuli(win)
@@ -324,6 +334,7 @@ def run() -> None:
     # ── CLEANUP ──────────────────────────────────────────────────────────────
     behavioral_writer.close()
     scan_log_writer.close()
+    win.saveFrameIntervals(str(run_dir / f"frame_intervals_{file_stem}.log"))
     logging.flush()
     win.close()
     core.quit()
