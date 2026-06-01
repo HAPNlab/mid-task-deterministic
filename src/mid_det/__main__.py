@@ -338,6 +338,8 @@ def run() -> None:
     # ── END SCREEN ───────────────────────────────────────────────────────────
     stimuli_obj.end.draw()
     win.flip()
+    rcon.print("[bold yellow]Press '0' to exit the experiment...[/bold yellow]")
+    logging.exp("Waiting for '0' key to exit experiment")
     kb.waitKeys(keyList=["0"], waitRelease=False)
 
     # ── CLEANUP ──────────────────────────────────────────────────────────────
