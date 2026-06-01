@@ -31,6 +31,33 @@ def _git_commit() -> str:
         return "unknown"
 
 
+def _cpu_name() -> str:
+    """Best-effort friendly CPU name.
+
+    ``platform.processor()`` returns the raw CPUID descriptor on Windows
+    (e.g. "Intel64 Family 6 Model 158 Stepping 11") and the bare arch on
+    macOS, neither of which is a marketing name. Read the registry on
+    Windows; otherwise fall back to ``platform.processor()``.
+    """
+    if platform.system() == "Windows":
+        try:
+            import winreg
+
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"HARDWARE\DESCRIPTION\System\CentralProcessor\0",
+            )
+            try:
+                name, _ = winreg.QueryValueEx(key, "ProcessorNameString")
+            finally:
+                winreg.CloseKey(key)
+            if name:
+                return str(name).strip()
+        except Exception:  # noqa: BLE001 — diagnostic only
+            pass
+    return platform.processor() or "unknown"
+
+
 @dataclass
 class TrialRecord:
     trial_n: int
@@ -196,7 +223,7 @@ def write_manifest(
             "hostname": socket.gethostname(),
             "platform": platform.platform(),
             "machine": platform.machine(),
-            "processor": platform.processor(),
+            "processor": _cpu_name(),
             "os_name": platform.system(),
             "os_release": platform.release(),
             "python_version": platform.python_version(),
