@@ -279,6 +279,7 @@ def run() -> None:
                 global_clock=global_clock,
                 row=row,
                 trial_n=trial_n,
+                n_trials=n_trials,
                 n_iti_trs=n_iti,
                 nominal_time=nominal_time,
                 total_earned=total_earned,
@@ -288,8 +289,8 @@ def run() -> None:
                 pulse_counter=pulse_counter,
                 calibration=calibration,
                 frame_dur_s=frame_dur_s,
+                on_window=view.on_window,
                 on_response=view.on_response,
-                on_outcome=view.on_outcome,
                 overlay=debug_overlay,
             )
 
@@ -304,8 +305,7 @@ def run() -> None:
             result_label = "HIT" if rec.hit else ("early" if rec.early_press else "miss")
 
             logging.exp(
-                f"Trial {trial_n:3d}/{n_trials}  {rec.cue_label:<5}  "
-                f"win={win_str}  {result_label:<5}  RT={rt_str:>6}  "
+                f"  -> {result_label:<5}  RT={rt_str:>6}  win={win_str}  "
                 f"outcome={rec.reward_outcome:>4}  total={f'${rec.total_earned}':>5}  "
                 f"hit_rate={hit_rate:3.0f}%"
             )

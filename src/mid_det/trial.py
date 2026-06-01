@@ -267,24 +267,20 @@ def _compute_reward(
     return "-$0.00", total_earned
 
 
-def run_outcome(
+def show_outcome(
     win: visual.Window,
     stimuli: Stimuli,
     kb: keyboard.Keyboard,
     hit: bool,
-    valence: str,
-    magnitude: int,
-    total_earned: int,
+    reward_outcome: str,
     overlay: DebugOverlay | None = None,
-) -> tuple[str, int]:
-    """Display outcome; return (reward_outcome, new_total_earned)."""
-    reward_outcome, new_total_earned = _compute_reward(hit, valence, magnitude, total_earned)
+) -> None:
+    """Display the outcome feedback for STUDY_TIMES_S['outcome'] seconds."""
     timer = core.CountdownTimer(config.STUDY_TIMES_S["outcome"])
     while timer.getTime() > 0:
         draw_feedback(stimuli, hit, reward_outcome)
         win.flip()
         _check_quit(kb, overlay)
-    return reward_outcome, new_total_earned
 
 
 def run_iti(
@@ -318,6 +314,7 @@ def run_trial(
     global_clock: core.Clock,
     row: pd.Series,
     trial_n: int,
+    n_trials: int,
     n_iti_trs: int,
     nominal_time: float,
     total_earned: int,
@@ -327,8 +324,8 @@ def run_trial(
     pulse_counter: PulseCounter,
     calibration: CalibrationState,
     frame_dur_s: float,
-    on_response: Callable[[bool, float | None, bool, int, float | str], None] | None = None,
-    on_outcome: Callable[[str, int, bool], None] | None = None,
+    on_window: Callable[[int], None] | None = None,
+    on_response: Callable[[bool, float | None, bool, int, float | str, str, int], None] | None = None,
     overlay: DebugOverlay | None = None,
 ) -> tuple[TrialRecord, TargetTimingRecord, list[ScanPhase], float, int]:
     """
@@ -348,9 +345,11 @@ def run_trial(
 
     target_dur_ms = int(round(target_dur_s * 1000))
     logging.exp(
-        f"  -> cue={label}  target_dur={target_dur_ms} ms  "
-        f"jitter={int(jitter_s * 1000)} ms"
+        f"Trial {trial_n:3d}/{n_trials}  cue={label}  "
+        f"target_dur={target_dur_ms} ms  jitter={int(jitter_s * 1000)} ms"
     )
+    if on_window is not None:
+        on_window(target_dur_ms)
 
     scan_phases: list[ScanPhase] = []
     tr_within = 0
@@ -410,8 +409,12 @@ def run_trial(
     )
     nominal_time += config.STUDY_TIMES_S["response"]
     target_dur_ms_actual = round(target_removed_at * 1000, 2) if target_removed_at is not None else ""
+    reward_outcome, total_earned = _compute_reward(hit, valence, magnitude, total_earned)
     if on_response is not None:
-        on_response(hit, rt_s, early_press, target_dur_ms, target_dur_ms_actual)
+        on_response(
+            hit, rt_s, early_press, target_dur_ms, target_dur_ms_actual,
+            reward_outcome, total_earned,
+        )
 
     # ── OUTCOME ──────────────────────────────────────────────────────────────
     pulse_ct += pulse_counter.wait_for_tr()
@@ -424,13 +427,9 @@ def run_trial(
         pulse_ct=pulse_ct,
     ))
     _update_overlay("outcome")
-    reward_outcome, total_earned = run_outcome(
-        win, stimuli, kb, hit, valence, magnitude, total_earned, overlay
-    )
+    show_outcome(win, stimuli, kb, hit, reward_outcome, overlay)
     nominal_time += config.STUDY_TIMES_S["outcome"]
     calibration.record_outcome(valence, magnitude, bool(hit))
-    if on_outcome is not None:
-        on_outcome(reward_outcome, total_earned, hit)
 
     # ── ITI ──────────────────────────────────────────────────────────────────
     for _ in range(n_iti_trs):
