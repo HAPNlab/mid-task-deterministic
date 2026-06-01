@@ -19,7 +19,20 @@ Unlike `mid-task`, this variant is **deterministic**:
 
 ## Quick Start
 
+UV is used for development; Anaconda is the production environment. Both install from the same
+`pyproject.toml` — see the [Development Guide](docs/development.md) for details.
+
+**UV (development):**
+
 ```bash
 uv venv && uv sync
+mid-task-det
+```
+
+**Anaconda (production):**
+
+```bash
+conda env create -f environment.yml
+conda activate mid-task-deterministic
 mid-task-det
 ```

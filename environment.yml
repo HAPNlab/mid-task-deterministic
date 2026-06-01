@@ -1,0 +1,15 @@
+name: mid-task-deterministic
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  # Heavy binary libs that benefit from conda (mirrors the macOS brew deps).
+  - hdf5
+  - openblas
+  - lapack
+  - pip:
+      # pip reads pyproject.toml — the single source of truth for the package
+      # and its PyPI dependencies. Use ".[dev]" instead of "." to include the
+      # dev/test extras.
+      - -e .

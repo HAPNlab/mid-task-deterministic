@@ -5,7 +5,9 @@ This guide covers setting up and developing `mid-task-deterministic`.
 ## Prerequisites
 
 - Python 3.11+
-- [UV](https://docs.astral.sh/uv/) – Fast Python package installer and resolver
+- One of:
+  - [UV](https://docs.astral.sh/uv/) – Fast Python package installer and resolver (**development**)
+  - [Anaconda / Miniconda](https://docs.conda.io/) (**production** deployment environment)
 - macOS or Windows (PsychoPy supports both; MCC DAQ hardware is Windows-only)
 
 ### macOS
@@ -25,11 +27,39 @@ Configure your DAQ board number in `src/mid_det/config.py` (`BOARD_NUM`).
 
 ## Quick Start
 
+UV is the development workflow; Anaconda is the production run environment. Both install the
+package from the same `pyproject.toml`.
+
+### UV (development)
+
 ```bash
 uv venv
 uv sync --all-extras
 uv run mid-task-det
 ```
+
+### Anaconda / conda (production)
+
+Conda provisions Python (and heavy binary libs), then pip installs the package from
+`pyproject.toml`:
+
+```bash
+conda env create -f environment.yml
+conda activate mid-task-deterministic
+mid-task-det
+```
+
+Or into an existing/custom environment:
+
+```bash
+conda create -n mid python=3.11
+conda activate mid
+pip install -e ".[dev]"
+```
+
+`pyproject.toml` is the shared, standard manifest. The UV-specific pieces (`[tool.uv.*]`,
+`uv.lock`) are ignored by pip/conda, so the conda install resolves dependencies fresh from PyPI
+rather than from the lockfile.
 
 ## Project Structure
 
