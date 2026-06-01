@@ -231,6 +231,8 @@ def run() -> None:
         pulse_counter.wait_for_start()
     else:
         keys_map = config.KEYS_BEHAVIORAL
+        rcon.print(f"[bold yellow]Press '{keys_map['start']}' to start the experiment...[/bold yellow]")
+        logging.exp(f"Waiting for '{keys_map['start']}' key to start experiment")
         kb.waitKeys(keyList=[keys_map["start"]], waitRelease=False)
     backend.start()
     rcon.print("[bold green]Scan started[/bold green] — global clock reset")
