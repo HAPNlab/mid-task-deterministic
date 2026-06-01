@@ -24,7 +24,7 @@ from mid_det.display import (
     draw_fixation_x,
     draw_target,
 )
-from mid_det.recorder import ScanPhase, TrialRecord
+from mid_det.recorder import ScanPhase, TargetTimingRecord, TrialRecord
 from mid_det.scanner import PulseCounter
 
 
@@ -94,6 +94,7 @@ def run_response(
     # right after glFinish but before callOnFlip callbacks fire). This is a
     # tighter proxy for the actual swap time than reading core.getTime() after
     # flip() returns, which additionally absorbs callback-dispatch overhead.
+    response_start_flip_t: float | None = None
     onset_flip_t: float | None = None
     removal_flip_t: float | None = None
     flip_iters = 0
@@ -146,6 +147,11 @@ def run_response(
         elif not target_shown:
             draw_fixation_x(stimuli)
         win.flip()
+
+        # Stamp the first flip of the response phase so we can later report the
+        # actual pre-target jitter wall time (analog of target_dur_ms_actual).
+        if response_start_flip_t is None:
+            response_start_flip_t = win.lastFrameT
 
         # Timestamp using win.lastFrameT, which PsychoPy sets inside flip()
         # right after the GPU finishes the swap. core.getTime() after flip()
@@ -200,6 +206,11 @@ def run_response(
     else:
         onset_to_removal_wall_ms = ""
 
+    if response_start_flip_t is not None and onset_flip_t is not None:
+        jitter_ms_actual = round((onset_flip_t - response_start_flip_t) * 1000, 2)
+    else:
+        jitter_ms_actual = ""
+
     if dropped_at_onset is not None:
         dropped_frames = int(getattr(win, "nDroppedFrames", 0) - dropped_at_onset)
     else:
@@ -226,6 +237,7 @@ def run_response(
         "onset_to_removal_wall_ms": onset_to_removal_wall_ms,
         "max_flip_interval_ms": round(max_intra_flip_ms, 2),
         "trial_clean": trial_clean,
+        "jitter_ms_actual": jitter_ms_actual,
     }
 
     return hit, rt_s, early_press, target_removed_at, diagnostics
@@ -318,11 +330,11 @@ def run_trial(
     on_response: Callable[[bool, float | None, bool, int, float | str], None] | None = None,
     on_outcome: Callable[[str, int, bool], None] | None = None,
     overlay: DebugOverlay | None = None,
-) -> tuple[TrialRecord, list[ScanPhase], float, int]:
+) -> tuple[TrialRecord, TargetTimingRecord, list[ScanPhase], float, int]:
     """
     Run one complete trial (cue → fixation → response → outcome → ITI).
 
-    Returns (record, scan_phases, nominal_time, total_earned).
+    Returns (record, target_timing, scan_phases, nominal_time, total_earned).
     """
     valence = str(row["valence"])
     magnitude = int(row["magnitude"])
@@ -360,8 +372,8 @@ def run_trial(
     tr_within += 1
     scan_phases.append(ScanPhase(
         trial_n=trial_n, phase="cue", tr_n=tr_within,
-        phase_global_time=time_onset,
-        phase_trial_time=0.0,
+        phase_onset_global_time=time_onset,
+        phase_onset_trial_time=0.0,
         pulse_ct=pulse_ct,
     ))
     _update_overlay("cue")
@@ -374,8 +386,8 @@ def run_trial(
     tr_within += 1
     scan_phases.append(ScanPhase(
         trial_n=trial_n, phase="fixation", tr_n=tr_within,
-        phase_global_time=fixation_start,
-        phase_trial_time=fixation_start - time_onset,
+        phase_onset_global_time=fixation_start,
+        phase_onset_trial_time=fixation_start - time_onset,
         pulse_ct=pulse_ct,
     ))
     _update_overlay("fixation")
@@ -388,8 +400,8 @@ def run_trial(
     tr_within += 1
     scan_phases.append(ScanPhase(
         trial_n=trial_n, phase="response", tr_n=tr_within,
-        phase_global_time=response_start,
-        phase_trial_time=response_start - time_onset,
+        phase_onset_global_time=response_start,
+        phase_onset_trial_time=response_start - time_onset,
         pulse_ct=pulse_ct,
     ))
     _update_overlay("response")
@@ -407,8 +419,8 @@ def run_trial(
     tr_within += 1
     scan_phases.append(ScanPhase(
         trial_n=trial_n, phase="outcome", tr_n=tr_within,
-        phase_global_time=outcome_start,
-        phase_trial_time=outcome_start - time_onset,
+        phase_onset_global_time=outcome_start,
+        phase_onset_trial_time=outcome_start - time_onset,
         pulse_ct=pulse_ct,
     ))
     _update_overlay("outcome")
@@ -427,8 +439,8 @@ def run_trial(
         tr_within += 1
         scan_phases.append(ScanPhase(
             trial_n=trial_n, phase="post-outcome-fixation", tr_n=tr_within,
-            phase_global_time=iti_start,
-            phase_trial_time=iti_start - time_onset,
+            phase_onset_global_time=iti_start,
+            phase_onset_trial_time=iti_start - time_onset,
             pulse_ct=pulse_ct,
         ))
         actual_time = global_clock.getTime()
@@ -449,6 +461,7 @@ def run_trial(
         cue_label=label,
         time_onset=round(time_onset, 6),
         jitter_ms=int(round(jitter_s * 1000)),
+        jitter_ms_actual=response_diag["jitter_ms_actual"],
         target_dur_ms=target_dur_ms,
         target_dur_ms_actual=target_dur_ms_actual,
         early_press=int(early_press),
@@ -460,16 +473,24 @@ def run_trial(
         trial_dur_ms=int(round((time_trial_end - time_onset) * 1000)),
         time_sched_end=round(time_sched_end, 6),
         timing_drift_ms=round((time_trial_end - time_sched_end) * 1000, 2),
+        n_iti_trs=n_iti_trs,
         total_trs=tr_within,
         subject_id=subject_id,
         run_n=run_n,
         pulse_ct=scan_phases[0].pulse_ct,
-        flip_iters=response_diag["flip_iters"],
-        n_target_frames=response_diag["n_target_frames"],
-        dropped_frames=response_diag["dropped_frames"],
-        onset_to_removal_wall_ms=response_diag["onset_to_removal_wall_ms"],
-        max_flip_interval_ms=response_diag["max_flip_interval_ms"],
-        trial_clean=int(response_diag["trial_clean"]),
+    )
+
+    target_timing = TargetTimingRecord(
+        trial_n=trial_n,
+        target_frames_scheduled=response_diag["n_target_frames"],
+        target_frames_shown=response_diag["flip_iters"],
+        target_visible_ms_scheduled=round(
+            response_diag["n_target_frames"] * frame_dur_s * 1000, 2
+        ),
+        target_visible_ms_measured=response_diag["onset_to_removal_wall_ms"],
+        dropped_frames_in_window=response_diag["dropped_frames"],
+        longest_frame_interval_ms=response_diag["max_flip_interval_ms"],
+        target_timing_ok=int(response_diag["trial_clean"]),
     )
 
     if overlay is not None:
@@ -477,4 +498,4 @@ def run_trial(
         overlay.state.last_rt_ms = f"{record.rt_ms:.0f} ms" if record.rt_ms != "" else "—"
         overlay.state.last_timing_drift_ms = record.timing_drift_ms
 
-    return record, scan_phases, nominal_time, total_earned
+    return record, target_timing, scan_phases, nominal_time, total_earned

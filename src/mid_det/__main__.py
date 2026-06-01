@@ -180,6 +180,7 @@ def run() -> None:
     # ── SETUP OUTPUT FILES ───────────────────────────────────────────────────
     file_stem = f"{session_info.subject_id}_run{session_info.run_n}"
     behavioral_writer = recorder.BehavioralCsvWriter(run_dir / f"behavioral_{file_stem}.csv")
+    target_timing_writer = recorder.TargetTimingCsvWriter(run_dir / f"target_timing_{file_stem}.csv")
     scan_log_writer = recorder.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
     recorder.write_manifest(
         run_dir=run_dir,
@@ -187,6 +188,11 @@ def run() -> None:
         session_time=session_time,
         frame_rate=frame_rate,
         n_trials=n_trials,
+        screen_diag=screen_diag,
+        frame_dur_s=frame_dur_s,
+        frame_dur_source=fps_source,
+        win_res=win_res,
+        priority_raised=(priority_status == "HIGH_PRIORITY_CLASS"),
     )
 
     # ── KEYBOARD & MOUSE ─────────────────────────────────────────────────────
@@ -266,7 +272,7 @@ def run() -> None:
             debug_overlay.state.n_trials_done = n_trials_done
             debug_overlay.state.total_earned = total_earned
 
-            rec, scan_phases, nominal_time, total_earned = trial.run_trial(
+            rec, target_timing, scan_phases, nominal_time, total_earned = trial.run_trial(
                 win=win,
                 stimuli=stimuli_obj,
                 kb=kb,
@@ -305,6 +311,7 @@ def run() -> None:
             )
 
             behavioral_writer.append(rec)
+            target_timing_writer.append(target_timing)
             for sp in scan_phases:
                 scan_log_writer.append(sp)
 
@@ -333,8 +340,8 @@ def run() -> None:
 
     # ── CLEANUP ──────────────────────────────────────────────────────────────
     behavioral_writer.close()
+    target_timing_writer.close()
     scan_log_writer.close()
-    win.saveFrameIntervals(str(run_dir / f"frame_intervals_{file_stem}.log"))
     logging.flush()
     win.close()
     core.quit()
