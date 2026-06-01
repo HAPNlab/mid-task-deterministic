@@ -45,11 +45,12 @@ def build_stimuli(win: visual.Window) -> Stimuli:
     y_scr = 1.0
     win_res = win.size
     x_scr = float(win_res[0]) / float(win_res[1])
-    font_h = y_scr / 25
+    font_h = y_scr / 20
+    trial_font_h = y_scr / 15  # Font size for cue label and outcome feedback (larger than instructions)
     wrap_w = x_scr / 1.5
     text_col = "white"
 
-    cue_radius = 0.2
+    cue_radius = 0.1
 
     fix_x = visual.TextStim(
         win, name="fix_x", pos=(0, 0), text="x", height=font_h * 2, color=text_col,
@@ -81,8 +82,8 @@ def build_stimuli(win: visual.Window) -> Stimuli:
 
     cue_label = visual.TextStim(
         win, name="cue_label", font="Arial",
-        pos=(0, -cue_radius - font_h * 1.5),
-        height=font_h, color=text_col,
+        pos=(-0.006, -cue_radius - trial_font_h),
+        height=trial_font_h, color=text_col,
         autoLog=False,
     )
 
@@ -93,7 +94,7 @@ def build_stimuli(win: visual.Window) -> Stimuli:
 
     feedback_amount = visual.TextStim(
         win, name="feedback_amount", font="Arial", pos=(0, 0),
-        height=font_h + y_scr / 30, wrapWidth=None, color=text_col,
+        height=trial_font_h + y_scr / 30, wrapWidth=None, color=text_col,
         autoLog=False,
     )
 
@@ -127,7 +128,7 @@ def build_stimuli(win: visual.Window) -> Stimuli:
 
     wait = visual.TextStim(
         win, name="wait", pos=(0, 0),
-        text="The task will begin momentarily. Get ready...",
+        text="Get ready!",
         height=font_h, color=text_col, wrapWidth=wrap_w,
         autoLog=False,
     )
