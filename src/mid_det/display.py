@@ -88,7 +88,7 @@ def build_stimuli(win: visual.Window) -> Stimuli:
     )
 
     target = visual.Polygon(
-        win, name="target", edges=3, radius=0.2, fillColor="white", lineWidth=0, pos=(0, 0),
+        win, name="target", edges=3, radius=0.18, fillColor="white", lineWidth=0, pos=(0, 0),
         autoLog=False,
     )
 
