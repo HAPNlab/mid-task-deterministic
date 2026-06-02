@@ -92,7 +92,45 @@ class _PosFloatValidator(Validator):
             )
 
 
-def _rt_prompt(label: str, default_ms: float, frame_dur_ms: float) -> float:
+class _RTMaxValidator(Validator):
+    """Positive-float validator with an upper-bound check (in ms)."""
+
+    def __init__(self, max_ms: float, response_ms: float, jitter_max_ms: float):
+        self.max_ms = max_ms
+        self.response_ms = response_ms
+        self.jitter_max_ms = jitter_max_ms
+
+    def validate(self, document):
+        text = document.text.strip()
+        try:
+            v = float(text)
+        except ValueError:
+            raise ValidationError(
+                message="Enter a number (ms)", cursor_position=len(text)
+            )
+        if v <= 0:
+            raise ValidationError(
+                message="Value must be > 0 ms", cursor_position=len(text)
+            )
+        if v > self.max_ms:
+            raise ValidationError(
+                message=(
+                    f"Must be ≤ {self.max_ms:.0f} ms "
+                    f"(response phase {self.response_ms:.0f} ms "
+                    f"− max jitter {self.jitter_max_ms:.0f} ms)"
+                ),
+                cursor_position=len(text),
+            )
+
+
+def _rt_prompt(
+    label: str,
+    default_ms: float,
+    frame_dur_ms: float,
+    max_ms: float | None = None,
+    response_ms: float | None = None,
+    jitter_max_ms: float | None = None,
+) -> float:
     """
     Interactive prompt for an RT value in milliseconds.
 
@@ -147,6 +185,10 @@ def _rt_prompt(label: str, default_ms: float, frame_dur_ms: float) -> float:
             return HTML("<b> Enter a positive number</b>")
         if v <= 0:
             return HTML("<ansired><b> ✗  Must be > 0 ms</b></ansired>")
+        if max_ms is not None and v > max_ms:
+            return HTML(
+                f"<ansired><b> ✗  Must be ≤ {max_ms:.0f} ms</b></ansired>"
+            )
         frames = v / frame_dur_ms
         n = int(round(frames))
         if abs(frames - n) < 0.01:
@@ -155,13 +197,22 @@ def _rt_prompt(label: str, default_ms: float, frame_dur_ms: float) -> float:
         else:
             return HTML(f"<ansiyellow><b> ≈ {frames:.2f} frames</b></ansiyellow>")
 
+    if max_ms is not None:
+        validator: Validator = _RTMaxValidator(
+            max_ms=max_ms,
+            response_ms=response_ms if response_ms is not None else 0.0,
+            jitter_max_ms=jitter_max_ms if jitter_max_ms is not None else 0.0,
+        )
+    else:
+        validator = _PosFloatValidator()
+
     try:
         raw = _pt_prompt(
             FormattedText([("class:prompt", "  ❯ ")]),
             default=f"{default_ms:.2f}",
             key_bindings=kb,
             bottom_toolbar=_toolbar,
-            validator=_PosFloatValidator(),
+            validator=validator,
             validate_while_typing=False,
             style=_PT_STYLE,
         )
@@ -233,13 +284,23 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     _rcon.print(Rule("[dim]Timing[/dim]", style="dim"))
     _rcon.print()
 
-    # Baseline RT: default = nearest frame-aligned value to config BASE_RT_S
+    # Baseline RT: default = nearest frame-aligned value to config BASE_RT_S.
+    # Bounded above by (response phase − max jitter) so the full target window
+    # can render on every trial regardless of jitter draw.
     config_base_ms = (
         config.BASE_RT_PRACTICE_S if run_n == "practice" else config.BASE_RT_S
     ) * 1000.0
     default_base_ms = _nearest_frame_aligned(config_base_ms, frame_dur_ms)
+    response_ms = config.STUDY_TIMES_S["response"] * 1000.0
+    jitter_max_ms = config.JITTER_MAX_S * 1000.0
+    max_target_ms = response_ms - jitter_max_ms
     base_rt_ms = _rt_prompt(
-        "Baseline RT", default_ms=default_base_ms, frame_dur_ms=frame_dur_ms
+        "Baseline RT",
+        default_ms=default_base_ms,
+        frame_dur_ms=frame_dur_ms,
+        max_ms=max_target_ms,
+        response_ms=response_ms,
+        jitter_max_ms=jitter_max_ms,
     )
 
     _rcon.print()

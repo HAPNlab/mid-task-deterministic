@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import platform
+import statistics
+
 import pyglet
 from psychopy import core, monitors, visual
 from psychopy.hardware import keyboard
@@ -29,7 +32,20 @@ class SessionInfo:
     rt_change_s: float = config.RT_CHANGE_S   # staircase step; set by wizard
 
 
-def setup_screen() -> tuple[list[int], visual.Window]:
+@dataclass
+class ScreenDiagnostics:
+    gl_vendor: str
+    gl_renderer: str
+    win_type: str
+    pyglet_version: str
+    platform_str: str
+    calib_median_ms: float
+    calib_p99_ms: float
+    calib_max_ms: float
+    calib_n: int
+
+
+def setup_screen() -> tuple[list[int], visual.Window, ScreenDiagnostics]:
     display = pyglet.canvas.get_display()
     screens = display.get_screens()
     win_res = [screens[-1].width, screens[-1].height]
@@ -50,7 +66,51 @@ def setup_screen() -> tuple[list[int], visual.Window]:
     handle = getattr(win, "winHandle", None)
     if handle is not None and hasattr(handle, "set_vsync"):
         handle.set_vsync(True)
-    return win_res, win
+
+    # Collect backend identifiers so timing spikes can be correlated with
+    # driver/compositor in post-hoc analysis.
+    try:
+        gl_info = pyglet.gl.current_context.get_info()
+        gl_vendor = gl_info.get_vendor()
+        gl_renderer = gl_info.get_renderer()
+    except Exception:  # noqa: BLE001 — diagnostic only
+        gl_vendor = "?"
+        gl_renderer = "?"
+
+    # VSYNC calibration: flip ~120 times and measure intervals. If the 99th
+    # percentile is well above one frame period, vsync is not actually blocking
+    # — typical on Windows under DWM composition or borderless fullscreen.
+    intervals_ms: list[float] = []
+    win.flip()  # warm-up; first interval after a stale context can be misleading
+    last_t = core.getTime()
+    for _ in range(120):
+        win.flip()
+        now = core.getTime()
+        intervals_ms.append((now - last_t) * 1000)
+        last_t = now
+    intervals_ms.sort()
+    median = statistics.median(intervals_ms)
+    p99 = intervals_ms[int(0.99 * len(intervals_ms)) - 1]
+    mx = intervals_ms[-1]
+
+    # Enable PsychoPy's frame interval recording so trial.run_response can read
+    # win.nDroppedFrames and isolate on-screen drops from measurement artefacts.
+    win.refreshThreshold = (median / 1000.0) * 1.5
+    win.recordFrameIntervals = True
+
+    diagnostics = ScreenDiagnostics(
+        gl_vendor=gl_vendor,
+        gl_renderer=gl_renderer,
+        win_type=str(getattr(win, "winType", "?")),
+        pyglet_version=str(getattr(pyglet, "version", "?")),
+        platform_str=platform.platform(),
+        calib_median_ms=round(median, 3),
+        calib_p99_ms=round(p99, 3),
+        calib_max_ms=round(mx, 3),
+        calib_n=len(intervals_ms),
+    )
+
+    return win_res, win, diagnostics
 
 
 def make_run_dir(data_dir: Path, session_info: SessionInfo, session_time: datetime) -> Path:

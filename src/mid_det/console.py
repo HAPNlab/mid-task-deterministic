@@ -73,6 +73,13 @@ class TrialLiveView:
         self._rows.append(self._current)
         self._refresh()
 
+    def on_window(self, target_dur_ms: int) -> None:
+        """Called by run_trial once the expected target window is chosen."""
+        r = self._current
+        assert r is not None
+        r.window_str = f"{target_dur_ms} ms"
+        self._refresh()
+
     def on_response(
         self,
         hit: bool,
@@ -80,8 +87,10 @@ class TrialLiveView:
         early_press: bool,
         target_dur_ms: int,
         target_dur_ms_actual: float | str,
+        reward_outcome: str,
+        new_total_earned: int,
     ) -> None:
-        """Called by run_trial after the response phase. Buffers data; does not refresh."""
+        """Called by run_trial right after the response TR — fills in all measured info."""
         r = self._current
         assert r is not None
         r.window_str = f"{target_dur_ms} ms"
@@ -93,11 +102,6 @@ class TrialLiveView:
         else:
             r.result_cell = "[red]miss[/red]"
         r.rt_str = f"{rt_s * 1000:.0f} ms" if rt_s is not None else "—"
-
-    def on_outcome(self, reward_outcome: str, new_total_earned: int, hit: bool) -> None:
-        """Called by run_trial after the outcome phase. Applies all buffered data and refreshes."""
-        r = self._current
-        assert r is not None
         r.outcome_str = reward_outcome
         r.total_str = f"${new_total_earned}"
         hit_rate = (self._n_hits_snapshot + int(hit)) / (self._n_done_snapshot + 1) * 100

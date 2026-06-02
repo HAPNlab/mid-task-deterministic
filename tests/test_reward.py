@@ -19,7 +19,7 @@ from mid_det.trial import _compute_reward
 
 
 @pytest.mark.parametrize(
-    "hit,valence,mag,expected_label,expected_delta",
+    "hit,polarity,mag,expected_label,expected_delta",
     [
         # Gain (circle) cues: hit → earn magnitude, miss → $0
         (True,  "gain", 5, "+$5.00", +5),
@@ -37,9 +37,9 @@ from mid_det.trial import _compute_reward
         (False, "loss", 0, "-$0.00",  0),
     ],
 )
-def test_all_12_conditions(hit, valence, mag, expected_label, expected_delta):
-    """All 12 (valence × magnitude × hit/miss) cases from PresentFeedback.m."""
-    label, new_total = _compute_reward(hit, valence, mag, total_earned=0)
+def test_all_12_conditions(hit, polarity, mag, expected_label, expected_delta):
+    """All 12 (polarity × magnitude × hit/miss) cases from PresentFeedback.m."""
+    label, new_total = _compute_reward(hit, polarity, mag, total_earned=0)
     assert label == expected_label
     assert new_total == expected_delta
 
@@ -51,7 +51,7 @@ def test_running_total_accumulates():
     """
     total = 0
     steps = [
-        # (hit, valence, mag, expected_total_after)
+        # (hit, polarity, mag, expected_total_after)
         (True,  "gain", 5,  5),   # +$5
         (False, "gain", 5,  5),   # $0  (miss)
         (True,  "loss", 5,  5),   # $0  (avoided)
@@ -59,6 +59,6 @@ def test_running_total_accumulates():
         (True,  "gain", 1,  1),   # +$1
         (False, "loss", 1,  0),   # -$1
     ]
-    for hit, valence, mag, expected in steps:
-        _, total = _compute_reward(hit, valence, mag, total)
+    for hit, polarity, mag, expected in steps:
+        _, total = _compute_reward(hit, polarity, mag, total)
         assert total == expected

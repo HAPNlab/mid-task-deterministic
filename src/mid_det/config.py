@@ -12,15 +12,17 @@ STUDY_TIMES_S: dict[str, float] = {
     "iti": 2.0,
 }
 
-# Valence → shape (and reward sign)
-VALENCES: list[str] = ["gain", "loss"]
-VALENCE_SHAPE: dict[str, str] = {"gain": "circle", "loss": "square"}
-VALENCE_SIGN: dict[str, int] = {"gain": +1, "loss": -1}
+# Polarity → shape (and reward sign). "polarity" is the gain/loss dimension;
+# kept distinct from the affective "valence" rated in the cue-ratings survey.
+POLARITIES: list[str] = ["gain", "loss"]
+POLARITY_SHAPE: dict[str, str] = {"gain": "circle", "loss": "square"}
+POLARITY_SIGN: dict[str, int] = {"gain": +1, "loss": -1}
 
 # Magnitude tiers (absolute dollar amounts)
 MAGNITUDES: list[int] = [0, 1, 5]
 
 # Trial type lookup: 6 cue types, matching MATLAB mid-task `var.cues` indexing.
+# Keys are (polarity, magnitude).
 # 1 = low square (-$0), 2 = mid square (-$1), 3 = high square (-$5),
 # 4 = low circle (+$0), 5 = mid circle (+$1), 6 = high circle (+$5).
 TRIAL_TYPE_MAP: dict[tuple[str, int], int] = {
@@ -72,7 +74,7 @@ KEYS_BEHAVIORAL: dict[str, str] = {"forward": "4", "back": "3", "start": "0", "e
 EXP_KEYS: list[str] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
 
-def cue_label(valence: str, magnitude: int) -> str:
-    """Return the on-screen dollar label for a (valence, magnitude) cue."""
-    sign = "+" if VALENCE_SIGN[valence] > 0 else "-"
+def cue_label(polarity: str, magnitude: int) -> str:
+    """Return the on-screen dollar label for a (polarity, magnitude) cue."""
+    sign = "+" if POLARITY_SIGN[polarity] > 0 else "-"
     return f"{sign}${magnitude}.00"

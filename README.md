@@ -5,7 +5,7 @@ A PsychoPy implementation of the Monetary Incentive Delay (MID) task for fMRI, a
 Unlike `mid-task`, this variant is **deterministic**:
 
 - No adaptive QUEST staircase — target duration is fixed per difficulty level.
-- Six cues from a 2 × 3 design (valence × magnitude), following the `fmo-task` scheme:
+- Six cues from a 2 × 3 design (polarity × magnitude), following the `fmo-task` scheme:
   - Circle (gain) with low/mid/high line → `+$0`, `+$1`, `+$5`
   - Square (loss) with low/mid/high line → `-$0`, `-$1`, `-$5`
 - Three fixed difficulty levels (`low`, `medium`, `high`) control target display duration.
@@ -19,7 +19,34 @@ Unlike `mid-task`, this variant is **deterministic**:
 
 ## Quick Start
 
+UV is used for development; Anaconda is the production environment. Both install from the same
+`pyproject.toml` — see the [Development Guide](docs/development.md) for details.
+
+**UV (development):**
+
 ```bash
 uv venv && uv sync
 mid-task-det
 ```
+
+**Anaconda (production):**
+
+```bash
+conda env create -f environment.yml
+conda activate mid-task-deterministic
+mid-task-det
+```
+
+## Cue-Ratings Survey
+
+A separate, self-paced survey (ported from MATLAB `RunRatings.m`) for rating each
+of the 6 cues on 7-point valence and arousal scales. Runs independently of the
+MID task:
+
+```bash
+mid-ratings-det
+```
+
+Output is a timestamped `data/<subject>_ratings_<ts>/` folder containing
+`<subject>_ratings.csv` (`polarity,magnitude,arousal,valence`) and `manifest.json`. See
+the [Usage Guide](docs/usage.md#cue-ratings-survey) for controls and details.

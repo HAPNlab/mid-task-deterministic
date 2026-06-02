@@ -5,7 +5,9 @@ This guide covers setting up and developing `mid-task-deterministic`.
 ## Prerequisites
 
 - Python 3.11+
-- [UV](https://docs.astral.sh/uv/) – Fast Python package installer and resolver
+- One of:
+  - [UV](https://docs.astral.sh/uv/) – Fast Python package installer and resolver (**development**)
+  - [Anaconda / Miniconda](https://docs.conda.io/) (**production** deployment environment)
 - macOS or Windows (PsychoPy supports both; MCC DAQ hardware is Windows-only)
 
 ### macOS
@@ -25,11 +27,39 @@ Configure your DAQ board number in `src/mid_det/config.py` (`BOARD_NUM`).
 
 ## Quick Start
 
+UV is the development workflow; Anaconda is the production run environment. Both install the
+package from the same `pyproject.toml`.
+
+### UV (development)
+
 ```bash
 uv venv
 uv sync --all-extras
 uv run mid-task-det
 ```
+
+### Anaconda / conda (production)
+
+Conda provisions Python (and heavy binary libs), then pip installs the package from
+`pyproject.toml`:
+
+```bash
+conda env create -f environment.yml
+conda activate mid-task-deterministic
+mid-task-det
+```
+
+Or into an existing/custom environment:
+
+```bash
+conda create -n mid python=3.11
+conda activate mid
+pip install -e ".[dev]"
+```
+
+`pyproject.toml` is the shared, standard manifest. The UV-specific pieces (`[tool.uv.*]`,
+`uv.lock`) are ignored by pip/conda, so the conda install resolves dependencies fresh from PyPI
+rather than from the lockfile.
 
 ## Project Structure
 
@@ -74,10 +104,10 @@ mid-task-deterministic/
 This project is forked from [`mid-task`](../mid-task) at the `next` branch. Key differences:
 
 - **No `quest.py`** — adaptive staircase removed. Target duration is fixed per difficulty level in `config.TARGET_DUR_S`.
-- **6 cue types** instead of 3 — adopted from `fmo-task`: 2 valences × 3 magnitudes (0 / 1 / 5).
+- **6 cue types** instead of 3 — adopted from `fmo-task`: 2 polarities × 3 magnitudes (0 / 1 / 5).
 - **Magnitude line rendering** — cue shape is an outline (circle for gain, square for loss) with a horizontal line at low/mid/high position to encode magnitude, plus a dollar label below.
 - **No accuracy label** shown to participants.
-- **Sequence CSV columns**: `valence, magnitude, difficulty, n_iti`.
+- **Sequence CSV columns**: `polarity, magnitude, difficulty, n_iti`.
 
 ## Key Constants (`config.py`)
 
@@ -113,7 +143,7 @@ Sequences live in `sequences/` as CSV files with columns:
 
 | Column | Values |
 |--------|--------|
-| `valence` | `gain`, `loss` |
+| `polarity` | `gain`, `loss` |
 | `magnitude` | `0`, `1`, `5` |
 | `difficulty` | `low`, `medium`, `high` |
 | `n_iti` | Number of ITI TRs (1 or 2) for pseudorandom spacing |

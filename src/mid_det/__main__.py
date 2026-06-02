@@ -4,6 +4,7 @@ Wires all modules together.
 """
 from __future__ import annotations
 
+import platform
 from datetime import datetime
 from pathlib import Path
 
@@ -25,7 +26,26 @@ from mid_det.console import TrialLiveView
 from mid_det.debug import DebugOverlay, DebugState
 
 
+def _raise_process_priority() -> str | None:
+    """Bump this process to high priority on Windows to reduce scheduler-induced
+    vsync stretches. Returns a short status string for the log, or None if not
+    applicable / unavailable."""
+    if platform.system() != "Windows":
+        return None
+    try:
+        import ctypes
+        HIGH_PRIORITY_CLASS = 0x00000080
+        handle = ctypes.windll.kernel32.GetCurrentProcess()
+        if ctypes.windll.kernel32.SetPriorityClass(handle, HIGH_PRIORITY_CLASS):
+            return "HIGH_PRIORITY_CLASS"
+        return f"SetPriorityClass failed (GetLastError={ctypes.windll.kernel32.GetLastError()})"
+    except Exception as e:
+        return f"unavailable ({e!r})"
+
+
 def run() -> None:
+    priority_status = _raise_process_priority()
+
     import argparse
     parser = argparse.ArgumentParser(prog="mid-task-det")
     parser.add_argument(
@@ -38,17 +58,30 @@ def run() -> None:
     # ── SCREEN & FRAME RATE ──────────────────────────────────────────────────
     # Open the window first so we have a real frame duration to pass into the
     # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
-    win_res, win = session.setup_screen()
+    win_res, win, screen_diag = session.setup_screen()
+
+    # Warm-up flips before frame-rate measurement: PsychoPy's detectingFrameDrops
+    # doc notes drops are common during startup as the GPU/driver settle.
+    for _ in range(30):
+        win.flip()
 
     if args.fps is not None:
         frame_rate: float = args.fps
         frame_dur_s: float = 1.0 / args.fps
         fps_source = "specified"
+    elif 1000.0 / 200.0 <= screen_diag.calib_median_ms <= 1000.0 / 30.0:
+        # Prefer the 120-flip VSYNC-calibration median: it's a more reliable
+        # estimator than getActualFrameRate(), and the response loop's
+        # `round(t / frame_dur_s)` termination is sensitive to small drift in
+        # frame_dur_s (see Windows run where 0.5% off triggered off-by-one
+        # iters on long-target trials).
+        frame_dur_s = screen_diag.calib_median_ms / 1000.0
+        frame_rate = 1.0 / frame_dur_s
+        fps_source = "vsync-calibration"
     else:
-        # Frame-count target removal depends on a known refresh rate. If PsychoPy
-        # can't get a stable measurement (typically a sign VSYNC isn't working —
-        # common on macOS dev rigs), bail out rather than silently degrading: a
-        # guessed rate would corrupt every target duration. Use --fps to override.
+        # Fallback: getActualFrameRate(). If that also fails, bail out rather
+        # than silently degrading — a guessed rate would corrupt every target
+        # duration. Use --fps to override.
         measured_fps = win.getActualFrameRate()
         if measured_fps is None or not (30.0 <= measured_fps <= 200.0):
             win.close()
@@ -85,6 +118,23 @@ def run() -> None:
     )
     logging.exp(f"Session: subject={session_info.subject_id}  run={session_info.run_n}  fmri={session_info.fmri}")
     logging.exp(f"Frame rate: {frame_rate:.2f} Hz  (frame period {frame_dur_s * 1000:.3f} ms)  [{fps_source}]")
+    logging.exp(
+        f"GL vendor={screen_diag.gl_vendor}  renderer={screen_diag.gl_renderer}  "
+        f"winType={screen_diag.win_type}  pyglet={screen_diag.pyglet_version}  "
+        f"platform={screen_diag.platform_str}"
+    )
+    logging.exp(
+        f"VSYNC calibration: median={screen_diag.calib_median_ms:.3f} ms  "
+        f"p99={screen_diag.calib_p99_ms:.3f} ms  max={screen_diag.calib_max_ms:.3f} ms  "
+        f"(n={screen_diag.calib_n})"
+    )
+    if priority_status is not None:
+        logging.exp(f"Process priority: {priority_status}")
+
+    # Enable per-flip interval recording for post-hoc dropped-frame analysis.
+    # 1.2 * frame period is the PsychoPy-documented default threshold.
+    win.refreshThreshold = frame_dur_s * 1.2
+    win.recordFrameIntervals = True
 
     # ── BUILD STIMULI ────────────────────────────────────────────────────────
     stimuli_obj = display.build_stimuli(win)
@@ -130,6 +180,7 @@ def run() -> None:
     # ── SETUP OUTPUT FILES ───────────────────────────────────────────────────
     file_stem = f"{session_info.subject_id}_run{session_info.run_n}"
     behavioral_writer = recorder.BehavioralCsvWriter(run_dir / f"behavioral_{file_stem}.csv")
+    target_timing_writer = recorder.TargetTimingCsvWriter(run_dir / f"target_timing_{file_stem}.csv")
     scan_log_writer = recorder.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
     recorder.write_manifest(
         run_dir=run_dir,
@@ -137,6 +188,11 @@ def run() -> None:
         session_time=session_time,
         frame_rate=frame_rate,
         n_trials=n_trials,
+        screen_diag=screen_diag,
+        frame_dur_s=frame_dur_s,
+        frame_dur_source=fps_source,
+        win_res=win_res,
+        priority_raised=(priority_status == "HIGH_PRIORITY_CLASS"),
     )
 
     # ── KEYBOARD & MOUSE ─────────────────────────────────────────────────────
@@ -175,6 +231,8 @@ def run() -> None:
         pulse_counter.wait_for_start()
     else:
         keys_map = config.KEYS_BEHAVIORAL
+        rcon.print(f"[bold yellow]Press '{keys_map['start']}' to start the experiment...[/bold yellow]")
+        logging.exp(f"Waiting for '{keys_map['start']}' key to start experiment")
         kb.waitKeys(keyList=[keys_map["start"]], waitRelease=False)
     backend.start()
     rcon.print("[bold green]Scan started[/bold green] — global clock reset")
@@ -192,7 +250,7 @@ def run() -> None:
     while global_clock.getTime() < t_fix_end:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if kb.getKeys(keyList=["grave"], waitRelease=False):
+        if kb.getKeys(keyList=["f3"], waitRelease=False):
             debug_overlay.toggle()
 
     nominal_time = global_clock.getTime()
@@ -207,7 +265,7 @@ def run() -> None:
         for trial_idx, row in sequence.iterrows():
             trial_n = int(trial_idx) + 1
             n_iti = int(row["n_iti"])
-            cue_lbl = config.cue_label(str(row["valence"]), int(row["magnitude"]))
+            cue_lbl = config.cue_label(str(row["polarity"]), int(row["magnitude"]))
 
             view.start_trial(trial_n, cue_lbl, n_hits, n_trials_done)
 
@@ -216,13 +274,14 @@ def run() -> None:
             debug_overlay.state.n_trials_done = n_trials_done
             debug_overlay.state.total_earned = total_earned
 
-            rec, scan_phases, nominal_time, total_earned = trial.run_trial(
+            rec, target_timing, scan_phases, nominal_time, total_earned = trial.run_trial(
                 win=win,
                 stimuli=stimuli_obj,
                 kb=kb,
                 global_clock=global_clock,
                 row=row,
                 trial_n=trial_n,
+                n_trials=n_trials,
                 n_iti_trs=n_iti,
                 nominal_time=nominal_time,
                 total_earned=total_earned,
@@ -232,8 +291,8 @@ def run() -> None:
                 pulse_counter=pulse_counter,
                 calibration=calibration,
                 frame_dur_s=frame_dur_s,
+                on_window=view.on_window,
                 on_response=view.on_response,
-                on_outcome=view.on_outcome,
                 overlay=debug_overlay,
             )
 
@@ -248,13 +307,13 @@ def run() -> None:
             result_label = "HIT" if rec.hit else ("early" if rec.early_press else "miss")
 
             logging.exp(
-                f"Trial {trial_n:3d}/{n_trials}  {rec.cue_label:<5}  "
-                f"win={win_str}  {result_label:<5}  RT={rt_str:>6}  "
+                f"  -> {result_label:<5}  RT={rt_str:>6}  win={win_str}  "
                 f"outcome={rec.reward_outcome:>4}  total={f'${rec.total_earned}':>5}  "
                 f"hit_rate={hit_rate:3.0f}%"
             )
 
             behavioral_writer.append(rec)
+            target_timing_writer.append(target_timing)
             for sp in scan_phases:
                 scan_log_writer.append(sp)
 
@@ -273,16 +332,19 @@ def run() -> None:
     while global_clock.getTime() < t_close_start + leadout_s:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if kb.getKeys(keyList=["grave"], waitRelease=False):
+        if kb.getKeys(keyList=["f3"], waitRelease=False):
             debug_overlay.toggle()
 
     # ── END SCREEN ───────────────────────────────────────────────────────────
     stimuli_obj.end.draw()
     win.flip()
+    rcon.print("[bold yellow]Press '0' to exit the experiment...[/bold yellow]")
+    logging.exp("Waiting for '0' key to exit experiment")
     kb.waitKeys(keyList=["0"], waitRelease=False)
 
     # ── CLEANUP ──────────────────────────────────────────────────────────────
     behavioral_writer.close()
+    target_timing_writer.close()
     scan_log_writer.close()
     logging.flush()
     win.close()

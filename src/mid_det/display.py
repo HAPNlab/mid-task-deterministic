@@ -3,7 +3,7 @@ PsychoPy visual component construction and draw helpers.
 No clocks, no response logic, no I/O.
 
 Cue rendering follows the fmo-task scheme:
-  - Circle (valence=gain) or Square (valence=loss) outline
+  - Circle (polarity=gain) or Square (polarity=loss) outline
   - A horizontal line across the shape at top / middle / bottom for
     magnitude 5 / 1 / 0 (line indicates where the "fill" level would be)
   - Dollar-amount text label below the shape
@@ -45,11 +45,12 @@ def build_stimuli(win: visual.Window) -> Stimuli:
     y_scr = 1.0
     win_res = win.size
     x_scr = float(win_res[0]) / float(win_res[1])
-    font_h = y_scr / 25
+    font_h = y_scr / 20
+    trial_font_h = y_scr / 15  # Font size for cue label and outcome feedback (larger than instructions)
     wrap_w = x_scr / 1.5
     text_col = "white"
 
-    cue_radius = 0.2
+    cue_radius = 0.1
 
     fix_x = visual.TextStim(
         win, name="fix_x", pos=(0, 0), text="x", height=font_h * 2, color=text_col,
@@ -81,19 +82,19 @@ def build_stimuli(win: visual.Window) -> Stimuli:
 
     cue_label = visual.TextStim(
         win, name="cue_label", font="Arial",
-        pos=(0, -cue_radius - font_h * 1.5),
-        height=font_h, color=text_col,
+        pos=(-0.006, -cue_radius - trial_font_h),
+        height=trial_font_h, color=text_col,
         autoLog=False,
     )
 
     target = visual.Polygon(
-        win, name="target", edges=3, radius=0.2, fillColor="white", lineWidth=0, pos=(0, 0),
+        win, name="target", edges=3, radius=0.18, fillColor="white", lineWidth=0, pos=(0, 0),
         autoLog=False,
     )
 
     feedback_amount = visual.TextStim(
         win, name="feedback_amount", font="Arial", pos=(0, 0),
-        height=font_h + y_scr / 30, wrapWidth=None, color=text_col,
+        height=trial_font_h + y_scr / 30, wrapWidth=None, color=text_col,
         autoLog=False,
     )
 
@@ -127,7 +128,7 @@ def build_stimuli(win: visual.Window) -> Stimuli:
 
     wait = visual.TextStim(
         win, name="wait", pos=(0, 0),
-        text="The task will begin momentarily. Get ready...",
+        text="Get ready!",
         height=font_h, color=text_col, wrapWidth=wrap_w,
         autoLog=False,
     )
@@ -164,10 +165,10 @@ def update_instr_keys(stimuli: Stimuli, fmri: bool) -> None:
     )
 
 
-def draw_cue(stimuli: Stimuli, valence: str, magnitude: int) -> None:
+def draw_cue(stimuli: Stimuli, polarity: str, magnitude: int) -> None:
     """Draw the trial cue: shape + magnitude line + dollar label."""
     # Shape body
-    if config.VALENCE_SHAPE[valence] == "circle":
+    if config.POLARITY_SHAPE[polarity] == "circle":
         radius = stimuli.cue_circle.radius
         stimuli.cue_circle.draw()
     else:
@@ -178,7 +179,7 @@ def draw_cue(stimuli: Stimuli, valence: str, magnitude: int) -> None:
     y_frac = _LINE_Y_FRAC[magnitude]
     # For circles the line is a chord, so its x extent shrinks away from the
     # center to stay inside the circle. For squares it spans the full width.
-    if config.VALENCE_SHAPE[valence] == "circle" and y_frac != 0.0:
+    if config.POLARITY_SHAPE[polarity] == "circle" and y_frac != 0.0:
         half_chord = radius * (1.0 - y_frac * y_frac) ** 0.5
     else:
         half_chord = radius
@@ -188,7 +189,7 @@ def draw_cue(stimuli: Stimuli, valence: str, magnitude: int) -> None:
     stimuli.cue_line.draw()
 
     # Dollar label
-    stimuli.cue_label.text = config.cue_label(valence, magnitude)
+    stimuli.cue_label.text = config.cue_label(polarity, magnitude)
     stimuli.cue_label.draw()
 
 

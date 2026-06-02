@@ -9,14 +9,15 @@ The hit/miss criterion is **"key pressed while target is visually displayed"**, 
 Removal is **frame-counted**. At session start we measure the refresh rate, compute `n_target_frames = round(target_dur_s / frame_dur_s)`, then draw the target for exactly that many flips and omit it on the next:
 
 ```python
+frames_shown = round(kb.clock.getTime() / frame_dur_s) + 1
 should_remove = (
     target_removed_at is None
     and target_onset_flip_done
-    and target_frames_drawn >= n_target_frames
+    and frames_shown >= n_target_frames
 )
 ```
 
-`target_frames_drawn` starts at 1 on the target-onset flip and increments on every subsequent flip where the target was drawn. As long as `win.flip()` blocks on VSYNC, the target is on-screen for `n_target_frames * frame_dur_s` and `target_dur_ms_actual` (read from `kb.clock` on the removal flip) lands within a few hundred µs of that.
+`frames_shown` is derived from `kb.clock` (reset on the target-onset flip via `callOnFlip`) rather than counted from loop iterations. The clock advances with wall time, so a dropped frame — one `flip()` that spans two vsync intervals — bumps `frames_shown` by 2 and removal happens one iteration sooner. Loop-iteration counting would tick once and leave the target on for one extra frame. Windows occasionally drops a frame even with VSYNC enabled; the clock-derived count absorbs it. `target_dur_ms_actual` (read from `kb.clock` on the removal flip) lands within a few hundred µs of `n_target_frames * frame_dur_s`.
 
 ### Refresh rate must be known at startup
 
@@ -36,6 +37,7 @@ Earlier iterations of this logic went through several problems:
 2. **One-frame overshoot**: switching the check to `kb.clock.getTime() >= target_dur_s` removed the undershoot but produced a consistent ~16 ms overshoot from the post-flip frame.
 3. **Boundary jitter outliers**: subtracting `frame_dur_s` from a clock threshold cancelled most of the overshoot, but boundary jitter occasionally bumped trials one frame earlier (11–17 ms outliers).
 4. **Brief detour through a clock-based gate** to tolerate broken macOS VSYNC. Reverted in favor of frame counting once we accepted that production is Windows-only and macOS dev sessions must pass `--fps` explicitly.
+5. **Iteration-counted frames**: an initial frame-counting implementation incremented a `target_frames_drawn` counter once per loop iteration. On Windows this overshot by exactly one frame on the ~20% of trials where a frame dropped — each dropped frame leaves the target visible for an extra vsync but only ticks the counter once. Fixed by deriving the count from `kb.clock` instead.
 
 ### Why this can't be solved in software (frame overshoot)
 
