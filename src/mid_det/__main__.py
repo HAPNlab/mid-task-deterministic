@@ -265,7 +265,7 @@ def run() -> None:
         for trial_idx, row in sequence.iterrows():
             trial_n = int(trial_idx) + 1
             n_iti = int(row["n_iti"])
-            cue_lbl = config.cue_label(str(row["valence"]), int(row["magnitude"]))
+            cue_lbl = config.cue_label(str(row["polarity"]), int(row["magnitude"]))
 
             view.start_trial(trial_n, cue_lbl, n_hits, n_trials_done)
 

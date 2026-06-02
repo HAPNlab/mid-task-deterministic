@@ -20,7 +20,7 @@ class DebugState:
     trial_n: int = 0
     n_trials: int = 0
     phase: str = "—"
-    valence: str = "—"
+    polarity: str = "—"
     magnitude: int = 0
     target_dur_ms: int = 0
     jitter_ms: int = 0
@@ -70,7 +70,7 @@ class DebugOverlay:
         return (
             f"[DEBUG]  sub:{s.subject_id}  run:{s.run_n}  fmri:{fmri_str}  fps:{fps_str}\n"
             f"trial:{s.trial_n}/{s.n_trials}  phase:{s.phase}\n"
-            f"cue:{s.valence} ${s.magnitude}  win:{s.target_dur_ms} ms  jitter:{s.jitter_ms} ms\n"
+            f"cue:{s.polarity} ${s.magnitude}  win:{s.target_dur_ms} ms  jitter:{s.jitter_ms} ms\n"
             f"hits:{s.n_hits}/{s.n_trials_done} ({hit_rate})  earned:${s.total_earned}  pulse:{s.pulse_ct}\n"
             f"last:{s.last_result}  RT:{s.last_rt_ms}  drift:{drift_sign}{s.last_timing_drift_ms:.1f} ms\n"
             f"t:{s.global_time:.3f} s  sched:{s.nominal_time:.3f} s"

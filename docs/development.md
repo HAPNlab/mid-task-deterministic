@@ -104,10 +104,10 @@ mid-task-deterministic/
 This project is forked from [`mid-task`](../mid-task) at the `next` branch. Key differences:
 
 - **No `quest.py`** — adaptive staircase removed. Target duration is fixed per difficulty level in `config.TARGET_DUR_S`.
-- **6 cue types** instead of 3 — adopted from `fmo-task`: 2 valences × 3 magnitudes (0 / 1 / 5).
+- **6 cue types** instead of 3 — adopted from `fmo-task`: 2 polarities × 3 magnitudes (0 / 1 / 5).
 - **Magnitude line rendering** — cue shape is an outline (circle for gain, square for loss) with a horizontal line at low/mid/high position to encode magnitude, plus a dollar label below.
 - **No accuracy label** shown to participants.
-- **Sequence CSV columns**: `valence, magnitude, difficulty, n_iti`.
+- **Sequence CSV columns**: `polarity, magnitude, difficulty, n_iti`.
 
 ## Key Constants (`config.py`)
 
@@ -143,7 +143,7 @@ Sequences live in `sequences/` as CSV files with columns:
 
 | Column | Values |
 |--------|--------|
-| `valence` | `gain`, `loss` |
+| `polarity` | `gain`, `loss` |
 | `magnitude` | `0`, `1`, `5` |
 | `difficulty` | `low`, `medium`, `high` |
 | `n_iti` | Number of ITI TRs (1 or 2) for pseudorandom spacing |

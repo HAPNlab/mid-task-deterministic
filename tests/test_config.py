@@ -7,7 +7,7 @@ from mid_det import config
 
 
 def test_trial_type_map_covers_all_conditions():
-    # 6 cue types: 2 valences × 3 magnitudes (matches MATLAB var.cues 1..6).
+    # 6 cue types: 2 polarities × 3 magnitudes (matches MATLAB var.cues 1..6).
     assert len(config.TRIAL_TYPE_MAP) == 6
     assert set(config.TRIAL_TYPE_MAP.values()) == set(range(1, 7))
     assert config.TRIAL_TYPE_MAP[("loss", 0)] == 1

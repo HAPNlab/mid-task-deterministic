@@ -70,7 +70,7 @@ Cue (2 s) → Fixation (2 s) → Response (2 s) → Outcome (2 s) → ITI (2–4
 
 ### Cue Types
 
-Six cues from a 2 × 3 design (valence × magnitude):
+Six cues from a 2 × 3 design (polarity × magnitude):
 
 | Cue | Shape | Line position | Hit outcome | Miss outcome |
 |-----|-------|---------------|-------------|--------------|
@@ -125,8 +125,8 @@ data/
 | Column | Description |
 |--------|-------------|
 | `trial_n` | Trial number (1-indexed) |
-| `trial_type` | Integer 1–18 encoding valence×magnitude×difficulty |
-| `valence` | `gain` or `loss` |
+| `trial_type` | Integer 1–18 encoding polarity×magnitude×difficulty |
+| `polarity` | `gain` or `loss` |
 | `magnitude` | 0, 1, or 5 |
 | `difficulty` | `low`, `medium`, or `high` |
 | `cue_label` | On-screen label (e.g. `+$5`, `-$1`) |
@@ -148,3 +148,56 @@ One row per trial phase: `trial_n`, `phase`, `tr_n`, `phase_global_time`, `phase
 ## Quitting Early
 
 Press **Escape** or **l** at any point to quit. Output files written up to that point are saved.
+
+## Cue-Ratings Survey
+
+A separate, self-paced survey (ported from MATLAB `RunRatings.m`) in which the
+participant re-views each of the 6 cues and rates it on two 7-point scales:
+**VALENCE** (very negative ↔ very positive) and **AROUSAL** (very low ↔ very
+high). It runs independently of the MID task — no scanner sync and no
+frame-timing measurement.
+
+### Launching
+
+```bash
+mid-ratings-det
+# or, without installation:
+uv run mid-ratings-det
+```
+
+### Startup Dialog
+
+| Field | Description |
+|-------|-------------|
+| **Subject ID** | Participant identifier; used in the output filename |
+| **Show instructions?** | Show the valence/arousal teaching pages and two practice sliders before rating |
+
+### Controls
+
+| Key | Action |
+|-----|--------|
+| `1` | Move slider left |
+| `2` | Move slider right |
+| `3` | Select rating / advance |
+| `Escape` | Quit at any time |
+
+Each cue is rated on valence first, then arousal. With instructions enabled the
+participant first sees teaching pages plus two hands-on practice sliders; the
+final "press 3 to select" page is always shown.
+
+### Output
+
+A timestamped run directory under `data/`, mirroring the MID task:
+
+```
+data/
+└── <subject>_ratings_20260602T143000/
+    ├── manifest.json
+    └── <subject>_ratings.csv
+```
+
+The CSV has one row per cue and columns `polarity,magnitude,arousal,valence`.
+`polarity` is `gain` or `loss` and `magnitude` is `0`/`1`/`5` (together they
+identify the cue); `arousal` and `valence` are integers 1–7. `manifest.json` is
+written at startup and records the version, subject, session time, and
+system/display info (no scanner/frame-timing fields — the survey is self-paced).

@@ -3,7 +3,7 @@ PsychoPy visual component construction and draw helpers.
 No clocks, no response logic, no I/O.
 
 Cue rendering follows the fmo-task scheme:
-  - Circle (valence=gain) or Square (valence=loss) outline
+  - Circle (polarity=gain) or Square (polarity=loss) outline
   - A horizontal line across the shape at top / middle / bottom for
     magnitude 5 / 1 / 0 (line indicates where the "fill" level would be)
   - Dollar-amount text label below the shape
@@ -165,10 +165,10 @@ def update_instr_keys(stimuli: Stimuli, fmri: bool) -> None:
     )
 
 
-def draw_cue(stimuli: Stimuli, valence: str, magnitude: int) -> None:
+def draw_cue(stimuli: Stimuli, polarity: str, magnitude: int) -> None:
     """Draw the trial cue: shape + magnitude line + dollar label."""
     # Shape body
-    if config.VALENCE_SHAPE[valence] == "circle":
+    if config.POLARITY_SHAPE[polarity] == "circle":
         radius = stimuli.cue_circle.radius
         stimuli.cue_circle.draw()
     else:
@@ -179,7 +179,7 @@ def draw_cue(stimuli: Stimuli, valence: str, magnitude: int) -> None:
     y_frac = _LINE_Y_FRAC[magnitude]
     # For circles the line is a chord, so its x extent shrinks away from the
     # center to stay inside the circle. For squares it spans the full width.
-    if config.VALENCE_SHAPE[valence] == "circle" and y_frac != 0.0:
+    if config.POLARITY_SHAPE[polarity] == "circle" and y_frac != 0.0:
         half_chord = radius * (1.0 - y_frac * y_frac) ** 0.5
     else:
         half_chord = radius
@@ -189,7 +189,7 @@ def draw_cue(stimuli: Stimuli, valence: str, magnitude: int) -> None:
     stimuli.cue_line.draw()
 
     # Dollar label
-    stimuli.cue_label.text = config.cue_label(valence, magnitude)
+    stimuli.cue_label.text = config.cue_label(polarity, magnitude)
     stimuli.cue_label.draw()
 
 

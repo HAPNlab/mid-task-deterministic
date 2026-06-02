@@ -25,6 +25,7 @@ dev = ["pytest"]
 
 [project.scripts]
 mid-task-det = "mid_det.__main__:run"
+mid-ratings-det = "mid_det.ratings.__main__:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]

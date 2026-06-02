@@ -2,7 +2,7 @@
 Per-cue adaptive target-window staircase.
 
 Mirrors MATLAB mid-task `PresentTarget.m` logic:
-  - For each cue type (valence, magnitude), track the history of calibrations
+  - For each cue type (polarity, magnitude), track the history of calibrations
     applied and whether each trial was a win.
   - First trial of a cue: window = base_rt.
   - Trials 2..MIN_TRIALS_FOR_ADAPT: keep previous calibration (no change yet).
@@ -25,9 +25,9 @@ class CalibrationState:
     _last_cal: dict[tuple[str, int], float | None] = field(default_factory=dict)
     _wins: dict[tuple[str, int], list[int]] = field(default_factory=dict)
 
-    def next_target_dur_s(self, valence: str, magnitude: int) -> float:
-        """Compute and stage the target window for this trial of (valence, magnitude)."""
-        key = (valence, magnitude)
+    def next_target_dur_s(self, polarity: str, magnitude: int) -> float:
+        """Compute and stage the target window for this trial of (polarity, magnitude)."""
+        key = (polarity, magnitude)
         last = self._last_cal.get(key)
         prior_wins = self._wins.setdefault(key, [])
 
@@ -45,5 +45,5 @@ class CalibrationState:
         self._last_cal[key] = current
         return current
 
-    def record_outcome(self, valence: str, magnitude: int, hit: bool) -> None:
-        self._wins[(valence, magnitude)].append(1 if hit else 0)
+    def record_outcome(self, polarity: str, magnitude: int, hit: bool) -> None:
+        self._wins[(polarity, magnitude)].append(1 if hit else 0)

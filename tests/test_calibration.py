@@ -16,15 +16,15 @@ from mid_det.calibration import CalibrationState
 
 def _run_cue(
     cal: CalibrationState,
-    valence: str,
+    polarity: str,
     magnitude: int,
     outcomes: list[bool],
 ) -> list[float]:
     """Drive CalibrationState through scripted outcomes; return window per trial."""
     windows = []
     for hit in outcomes:
-        windows.append(cal.next_target_dur_s(valence, magnitude))
-        cal.record_outcome(valence, magnitude, hit)
+        windows.append(cal.next_target_dur_s(polarity, magnitude))
+        cal.record_outcome(polarity, magnitude, hit)
     return windows
 
 

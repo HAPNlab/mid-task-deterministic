@@ -58,11 +58,33 @@ def _cpu_name() -> str:
     return platform.processor() or "unknown"
 
 
+def _psychopy_version() -> str:
+    try:
+        import psychopy  # type: ignore
+        return getattr(psychopy, "__version__", "unknown")
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+def _system_info() -> dict:
+    return {
+        "hostname": socket.gethostname(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "processor": _cpu_name(),
+        "os_name": platform.system(),
+        "os_release": platform.release(),
+        "python_version": platform.python_version(),
+        "psychopy_version": _psychopy_version(),
+        "git_commit": _git_commit(),
+    }
+
+
 @dataclass
 class TrialRecord:
     trial_n: int
     trial_type: int
-    valence: str
+    polarity: str
     magnitude: int
     cue_label: str
     time_onset: float
@@ -109,7 +131,7 @@ class ScanPhase:
 
 
 BEHAVIORAL_COLUMNS: list[str] = [
-    "trial_n", "trial_type", "valence", "magnitude", "cue_label",
+    "trial_n", "trial_type", "polarity", "magnitude", "cue_label",
     "time_onset", "jitter_ms", "jitter_ms_actual",
     "target_dur_ms", "target_dur_ms_actual", "early_press", "hit", "rt_ms",
     "reward_outcome", "total_earned", "time_trial_end", "trial_dur_ms",
@@ -193,12 +215,6 @@ def write_manifest(
         JITTER_MAX_S,
     )
 
-    try:
-        import psychopy  # type: ignore
-        psychopy_version = getattr(psychopy, "__version__", "unknown")
-    except Exception:  # noqa: BLE001
-        psychopy_version = "unknown"
-
     manifest = {
         "mid_task_deterministic_version": __version__,
         "subject_id": session_info.subject_id,
@@ -219,17 +235,7 @@ def write_manifest(
             "jitter_min_s": JITTER_MIN_S,
             "jitter_max_s": JITTER_MAX_S,
         },
-        "system": {
-            "hostname": socket.gethostname(),
-            "platform": platform.platform(),
-            "machine": platform.machine(),
-            "processor": _cpu_name(),
-            "os_name": platform.system(),
-            "os_release": platform.release(),
-            "python_version": platform.python_version(),
-            "psychopy_version": psychopy_version,
-            "git_commit": _git_commit(),
-        },
+        "system": _system_info(),
         "display": {
             "gl_vendor": screen_diag.gl_vendor,
             "gl_renderer": screen_diag.gl_renderer,
@@ -249,6 +255,45 @@ def write_manifest(
             "priority_raised": priority_raised,
             "argv": sys.argv,
         },
+    }
+    with open(run_dir / "manifest.json", "w") as f:
+        json.dump(manifest, f, indent=2)
+
+
+def write_ratings_manifest(
+    run_dir: Path,
+    subject_id: str,
+    show_instructions: bool,
+    session_time: datetime,
+    screen_diag: "ScreenDiagnostics",
+    win_res: list[int],
+    n_cues: int,
+    scale_points: int,
+) -> None:
+    """Write manifest.json for a cue-ratings survey run.
+
+    The survey is self-paced (no scanner sync / frame-timing), so this is a
+    trimmed version of write_manifest — no study_params or frame-rate fields.
+    """
+    from mid_det import __version__
+
+    manifest = {
+        "mid_task_deterministic_version": __version__,
+        "task": "cue-ratings",
+        "subject_id": subject_id,
+        "show_instructions": show_instructions,
+        "session_time": session_time.isoformat(timespec="seconds"),
+        "n_cues": n_cues,
+        "scale_points": scale_points,
+        "system": _system_info(),
+        "display": {
+            "gl_vendor": screen_diag.gl_vendor,
+            "gl_renderer": screen_diag.gl_renderer,
+            "win_type": screen_diag.win_type,
+            "pyglet_version": screen_diag.pyglet_version,
+            "resolution": [int(x) for x in win_res],
+        },
+        "process": {"argv": sys.argv},
     }
     with open(run_dir / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)

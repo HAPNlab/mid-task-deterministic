@@ -31,7 +31,7 @@ from mid_det.scanner import PulseCounter
 def run_cue(
     win: visual.Window,
     stimuli: Stimuli,
-    valence: str,
+    polarity: str,
     magnitude: int,
     kb: keyboard.Keyboard,
     overlay: DebugOverlay | None = None,
@@ -39,7 +39,7 @@ def run_cue(
     """Display cue for STUDY_TIMES_S['cue'] seconds."""
     timer = core.CountdownTimer(config.STUDY_TIMES_S["cue"])
     while timer.getTime() > 0:
-        draw_cue(stimuli, valence, magnitude)
+        draw_cue(stimuli, polarity, magnitude)
         win.flip()
         _check_quit(kb, overlay)
 
@@ -244,7 +244,7 @@ def run_response(
 
 
 def _compute_reward(
-    hit: bool, valence: str, magnitude: int, total_earned: int
+    hit: bool, polarity: str, magnitude: int, total_earned: int
 ) -> tuple[str, int]:
     """
     Return (reward_outcome_label, new_total_earned).
@@ -252,7 +252,7 @@ def _compute_reward(
     Gain trial:  hit → +$magnitude, miss → $0
     Loss trial:  hit → $0,          miss → -$magnitude
     """
-    if valence == "gain":
+    if polarity == "gain":
         if hit and magnitude > 0:
             return f"+${magnitude}.00", total_earned + magnitude
         if hit and magnitude == 0:
@@ -333,15 +333,15 @@ def run_trial(
 
     Returns (record, target_timing, scan_phases, nominal_time, total_earned).
     """
-    valence = str(row["valence"])
+    polarity = str(row["polarity"])
     magnitude = int(row["magnitude"])
-    trial_type = config.TRIAL_TYPE_MAP[(valence, magnitude)]
-    target_dur_s = calibration.next_target_dur_s(valence, magnitude)
+    trial_type = config.TRIAL_TYPE_MAP[(polarity, magnitude)]
+    target_dur_s = calibration.next_target_dur_s(polarity, magnitude)
     jitter_s = random.uniform(
         config.JITTER_MIN_S,
         config.JITTER_MAX_S,
     )
-    label = config.cue_label(valence, magnitude)
+    label = config.cue_label(polarity, magnitude)
 
     target_dur_ms = int(round(target_dur_s * 1000))
     logging.exp(
@@ -357,7 +357,7 @@ def run_trial(
     def _update_overlay(phase: str) -> None:
         if overlay is not None:
             overlay.state.phase = phase
-            overlay.state.valence = valence
+            overlay.state.polarity = polarity
             overlay.state.magnitude = magnitude
             overlay.state.target_dur_ms = target_dur_ms
             overlay.state.jitter_ms = int(jitter_s * 1000)
@@ -376,7 +376,7 @@ def run_trial(
         pulse_ct=pulse_ct,
     ))
     _update_overlay("cue")
-    run_cue(win, stimuli, valence, magnitude, kb, overlay)
+    run_cue(win, stimuli, polarity, magnitude, kb, overlay)
     nominal_time += config.STUDY_TIMES_S["cue"]
 
     # ── FIXATION ──────────────────────────────────────────────────────────────
@@ -409,7 +409,7 @@ def run_trial(
     )
     nominal_time += config.STUDY_TIMES_S["response"]
     target_dur_ms_actual = round(target_removed_at * 1000, 2) if target_removed_at is not None else ""
-    reward_outcome, total_earned = _compute_reward(hit, valence, magnitude, total_earned)
+    reward_outcome, total_earned = _compute_reward(hit, polarity, magnitude, total_earned)
     if on_response is not None:
         on_response(
             hit, rt_s, early_press, target_dur_ms, target_dur_ms_actual,
@@ -429,7 +429,7 @@ def run_trial(
     _update_overlay("outcome")
     show_outcome(win, stimuli, kb, hit, reward_outcome, overlay)
     nominal_time += config.STUDY_TIMES_S["outcome"]
-    calibration.record_outcome(valence, magnitude, bool(hit))
+    calibration.record_outcome(polarity, magnitude, bool(hit))
 
     # ── ITI ──────────────────────────────────────────────────────────────────
     for _ in range(n_iti_trs):
@@ -455,7 +455,7 @@ def run_trial(
     record = TrialRecord(
         trial_n=trial_n,
         trial_type=trial_type,
-        valence=valence,
+        polarity=polarity,
         magnitude=magnitude,
         cue_label=label,
         time_onset=round(time_onset, 6),

@@ -25,13 +25,13 @@ from mid_det.sequences import load_sequence
 @pytest.mark.parametrize("run_n", ["1", "2", "practice"])
 def test_required_columns_present(run_n):
     df = load_sequence(run_n)
-    assert {"valence", "magnitude", "n_iti"}.issubset(df.columns)
+    assert {"polarity", "magnitude", "n_iti"}.issubset(df.columns)
 
 
 @pytest.mark.parametrize("run_n", ["1", "2", "practice"])
-def test_valence_and_magnitude_values_valid(run_n):
+def test_polarity_and_magnitude_values_valid(run_n):
     df = load_sequence(run_n)
-    assert df["valence"].isin(config.VALENCES).all()
+    assert df["polarity"].isin(config.POLARITIES).all()
     assert df["magnitude"].isin(config.MAGNITUDES).all()
 
 
@@ -45,18 +45,18 @@ def test_valence_and_magnitude_values_valid(run_n):
 def test_trial_count_and_cue_balance(run_n, expected_total, per_cue):
     """
     Total trials and per-cue counts must match MATLAB main.m cues arrays.
-    Each of the 6 cue types (2 valences × 3 magnitudes) appears equally often.
+    Each of the 6 cue types (2 polaritys × 3 magnitudes) appears equally often.
     """
     df = load_sequence(run_n)
     assert len(df) == expected_total, (
         f"run={run_n}: expected {expected_total} trials, got {len(df)}"
     )
-    counts = df.groupby(["valence", "magnitude"]).size()
-    for valence in config.VALENCES:
+    counts = df.groupby(["polarity", "magnitude"]).size()
+    for polarity in config.POLARITIES:
         for mag in config.MAGNITUDES:
-            n = counts.get((valence, mag), 0)
+            n = counts.get((polarity, mag), 0)
             assert n == per_cue, (
-                f"run={run_n}: cue ({valence},{mag}) appears {n} times, "
+                f"run={run_n}: cue ({polarity},{mag}) appears {n} times, "
                 f"expected {per_cue}"
             )
 
@@ -127,10 +127,10 @@ def test_sequences_order():
         expected_sequence = []
 
         for cue_raw, seconds_iti in zip(run_spec["cues"], run_spec["seconds_iti"]):
-            valence, magnitude = cues_conversion[cue_raw]
+            polarity, magnitude = cues_conversion[cue_raw]
 
             expected_sequence.append({
-                "valence": valence,
+                "polarity": polarity,
                 "magnitude": magnitude,
                 "n_iti": seconds_iti // 2,
             })
