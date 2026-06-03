@@ -115,7 +115,7 @@ class TargetTimingRecord:
     target_frames_shown: int
     target_visible_ms_scheduled: float
     target_visible_ms_measured: float | str
-    dropped_frames_in_window: int
+    late_flips_in_window: int
     longest_frame_interval_ms: float
     target_timing_ok: int
 
@@ -143,7 +143,7 @@ TARGET_TIMING_COLUMNS: list[str] = [
     "trial_n",
     "target_frames_scheduled", "target_frames_shown",
     "target_visible_ms_scheduled", "target_visible_ms_measured",
-    "dropped_frames_in_window", "longest_frame_interval_ms",
+    "late_flips_in_window", "longest_frame_interval_ms",
     "target_timing_ok",
 ]
 

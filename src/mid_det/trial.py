@@ -487,7 +487,7 @@ def run_trial(
             response_diag["n_target_frames"] * frame_dur_s * 1000, 2
         ),
         target_visible_ms_measured=response_diag["onset_to_removal_wall_ms"],
-        dropped_frames_in_window=response_diag["dropped_frames"],
+        late_flips_in_window=response_diag["dropped_frames"],
         longest_frame_interval_ms=response_diag["max_flip_interval_ms"],
         target_timing_ok=int(response_diag["trial_clean"]),
     )
