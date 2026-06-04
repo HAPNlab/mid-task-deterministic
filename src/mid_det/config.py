@@ -69,8 +69,8 @@ MR_SETTINGS: dict = {
 }
 
 # Keyboard layouts
-KEYS_FMRI: dict[str, str] = {"forward": "7", "back": "6", "start": "0", "end": "l"}
-KEYS_BEHAVIORAL: dict[str, str] = {"forward": "4", "back": "3", "start": "0", "end": "l"}
+KEYS_FMRI: dict[str, str] = {"forward": "1", "start": "0", "end": "escape"}
+KEYS_BEHAVIORAL: dict[str, str] = {"forward": "1", "start": "0", "end": "escape"}
 EXP_KEYS: list[str] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
 

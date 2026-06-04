@@ -14,6 +14,7 @@ import statistics
 import pyglet
 from psychopy import core, monitors, visual
 from psychopy.hardware import keyboard
+from rich.console import Console
 
 from mid_det import config
 
@@ -125,11 +126,11 @@ def display_instructions(
     stimuli,              # Stimuli dataclass from display.py; avoid circular import
     session_info: SessionInfo,
     kb: keyboard.Keyboard,
+    rcon: Console,
 ) -> None:
     """Display instructions from text/instructions_MID.txt one page at a time."""
     keys_map = config.KEYS_FMRI if session_info.fmri else config.KEYS_BEHAVIORAL
     forward_key = keys_map["forward"]
-    back_key = keys_map["back"]
     start_key = keys_map["start"]
     end_key = keys_map["end"]
 
@@ -150,25 +151,23 @@ def display_instructions(
     while True:
         stimuli.instr_prompt.text = pages[page_idx]
         stimuli.instr_prompt.draw()
-        if page_idx == 0:
-            stimuli.instr_first.draw()
-        else:
-            stimuli.instr_move.draw()
+        stimuli.instr_first.draw()
         win.flip()
 
-        pressed = kb.getKeys(keyList=[forward_key, back_key, end_key], waitRelease=False)
+        pressed = kb.getKeys(keyList=[forward_key, end_key], waitRelease=False)
         if not pressed:
             continue
         key_name = pressed[0].name
         if key_name == end_key:
             core.quit()
-        elif key_name == back_key and page_idx > 0:
-            page_idx -= 1
         elif key_name == forward_key:
             page_idx += 1
             if page_idx >= len(pages):
                 break
 
+    rcon.print(
+        f"[bold yellow]End of instructions — press '{start_key}' to continue...[/bold yellow]"
+    )
     while True:
         stimuli.instr_finish.draw()
         win.flip()

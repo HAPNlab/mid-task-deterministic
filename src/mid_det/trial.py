@@ -301,7 +301,7 @@ def run_iti(
 
 
 def _check_quit(kb: keyboard.Keyboard, overlay: DebugOverlay | None = None) -> None:
-    if kb.getKeys(keyList=["escape", "l"], waitRelease=False):
+    if kb.getKeys(keyList=["escape"], waitRelease=False):
         core.quit()
     if overlay is not None and kb.getKeys(keyList=["f3"], waitRelease=False):
         overlay.toggle()

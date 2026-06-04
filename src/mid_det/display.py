@@ -34,7 +34,6 @@ class Stimuli:
     feedback_amount: visual.TextStim
     instr_prompt: visual.TextStim
     instr_first: visual.TextStim
-    instr_move: visual.TextStim
     instr_finish: visual.TextStim
     wait: visual.TextStim
     end: visual.TextStim
@@ -50,7 +49,7 @@ def build_stimuli(win: visual.Window) -> Stimuli:
     wrap_w = x_scr / 1.5
     text_col = "white"
 
-    cue_radius = 0.1
+    cue_radius = 0.14
 
     fix_x = visual.TextStim(
         win, name="fix_x", pos=(0, 0), text="x", height=font_h * 2, color=text_col,
@@ -88,7 +87,7 @@ def build_stimuli(win: visual.Window) -> Stimuli:
     )
 
     target = visual.Polygon(
-        win, name="target", edges=3, radius=0.18, fillColor="white", lineWidth=0, pos=(0, 0),
+        win, name="target", edges=3, radius=0.14, fillColor="white", lineWidth=0, pos=(0, 0),
         autoLog=False,
     )
 
@@ -106,12 +105,6 @@ def build_stimuli(win: visual.Window) -> Stimuli:
     keys_map = config.KEYS_BEHAVIORAL  # updated per session in update_instr_keys
     instr_first = visual.TextStim(
         win, name="instr_first", text=f"Press {keys_map['forward']} to continue.",
-        height=font_h, color=text_col, pos=(0, -y_scr / 4),
-        autoLog=False,
-    )
-    instr_move = visual.TextStim(
-        win, name="instr_move",
-        text=f"Press {keys_map['forward']} to continue, or {keys_map['back']} to go back.",
         height=font_h, color=text_col, pos=(0, -y_scr / 4),
         autoLog=False,
     )
@@ -149,7 +142,6 @@ def build_stimuli(win: visual.Window) -> Stimuli:
         feedback_amount=feedback_amount,
         instr_prompt=instr_prompt,
         instr_first=instr_first,
-        instr_move=instr_move,
         instr_finish=instr_finish,
         wait=wait,
         end=end,
@@ -160,9 +152,6 @@ def update_instr_keys(stimuli: Stimuli, fmri: bool) -> None:
     """Update instruction navigation key labels based on run mode."""
     keys_map = config.KEYS_FMRI if fmri else config.KEYS_BEHAVIORAL
     stimuli.instr_first.text = f"Press {keys_map['forward']} to continue."
-    stimuli.instr_move.text = (
-        f"Press {keys_map['forward']} to continue, or {keys_map['back']} to go back."
-    )
 
 
 def draw_cue(stimuli: Stimuli, polarity: str, magnitude: int) -> None:

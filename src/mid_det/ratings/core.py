@@ -14,8 +14,8 @@ from pathlib import Path
 # 7-point scale (MATLAB c.numEls = 7).
 N_ELS: int = 7
 
-# Slider start positions (MATLAB: valence = round(numEls/2) = 4, arousal = 1).
-START_SLIDEPOS: dict[str, int] = {"valence": 4, "arousal": 1}
+# Slider start positions. Both scales start at the middle (round(numEls/2) = 4).
+START_SLIDEPOS: dict[str, int] = {"valence": 4, "arousal": 4}
 
 
 @dataclass(frozen=True)

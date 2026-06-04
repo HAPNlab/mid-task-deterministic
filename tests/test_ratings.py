@@ -37,10 +37,10 @@ def test_seven_point_scale():
     assert len(core.AROUSAL_COLORS_255) == 7
 
 
-def test_start_positions_match_matlab():
-    # MATLAB: valence c.slidepos = round(numEls/2) = 4; arousal c.slidepos = 1.
+def test_start_positions():
+    # Both scales start at the middle of the 7-point scale: round(numEls/2) = 4.
     assert core.START_SLIDEPOS["valence"] == 4
-    assert core.START_SLIDEPOS["arousal"] == 1
+    assert core.START_SLIDEPOS["arousal"] == 4
 
 
 def test_slider_clamping():

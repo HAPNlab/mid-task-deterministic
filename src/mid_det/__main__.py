@@ -212,7 +212,7 @@ def run() -> None:
 
     # ── INSTRUCTIONS ─────────────────────────────────────────────────────────
     if session_info.show_instructions:
-        session.display_instructions(win, stimuli_obj, session_info, kb)
+        session.display_instructions(win, stimuli_obj, session_info, kb, rcon)
 
     # ── PULSE COUNTER ────────────────────────────────────────────────────────
     backend = scanner.make_backend(session_info.fmri)

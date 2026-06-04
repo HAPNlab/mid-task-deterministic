@@ -40,6 +40,8 @@ _KEY_LEFT = "1"
 _KEY_RIGHT = "2"
 _KEY_SELECT = "3"
 _ADVANCE_KEYS = [_KEY_LEFT, _KEY_RIGHT, _KEY_SELECT]
+# Instruction/text pages advance on button 1 only (forward-only, no going back).
+_PAGE_ADVANCE_KEYS = [_KEY_LEFT]
 _QUIT_KEYS = ["escape"]
 
 
@@ -78,7 +80,7 @@ def _show_text_page(
     text_stim.draw()
     hint_stim.draw()
     win.flip()
-    _wait_keys(kb, _ADVANCE_KEYS)
+    _wait_keys(kb, _PAGE_ADVANCE_KEYS)
 
 
 def _run_slider(
@@ -159,7 +161,7 @@ def run() -> None:
         height=1.0 / 22, color="white", wrapWidth=x_scr / 1.4, autoLog=False,
     )
     instr_hint = visual.TextStim(
-        win, name="page_hint", font="Arial", text="Press button 3 to continue.",
+        win, name="page_hint", font="Arial", text="Press button 1 to continue.",
         pos=(0, -0.38), height=1.0 / 28, color="white", autoLog=False,
     )
 
