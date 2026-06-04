@@ -23,23 +23,26 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Set up Python
-        run: uv python install
-
-      # Install only this package + its non-PsychoPy needs for the logic tests.
-      # PsychoPy (a heavy GUI/audio dep) is deliberately NOT installed: it's
-      # fragile on headless CI and is only needed by the display-bound tests
-      # below, which are excluded. The calibration/config/scanner/sequences/
-      # ratings tests — including the MATLAB-parity test — need no display.
-      - name: Sync dependencies (no PsychoPy)
-        run: uv sync --no-install-package psychopy --inexact
-
-      # Tests that transitively import PsychoPy are skipped here (run them
-      # locally with a full `uv sync`): test_overlay, test_reward,
-      # test_trial_boundary, test_recorder.
-      - name: Run display-free tests
+      # PsychoPy is deliberately NOT installed: it's a heavy GUI/audio dep whose
+      # transitive build (ffpyplayer → SDL headers) is fragile on headless CI,
+      # and it's only needed by the display-bound tests excluded below. The
+      # display-free modules under test import nothing beyond the stdlib except
+      # pandas (sequences.py), so we install just that + pytest and put `src` on
+      # PYTHONPATH rather than resolving the project's full dependency graph.
+      - name: Create venv and install minimal test deps
         run: |
-          uv run --no-sync pytest -v \
+          uv venv
+          uv pip install pytest pandas
+
+      # Tests that transitively import PsychoPy are excluded here (run them
+      # locally with a full `uv sync`): test_overlay, test_reward,
+      # test_trial_boundary, test_recorder. Octave (installed above) lets the
+      # MATLAB-parity test actually run rather than skip.
+      - name: Run display-free tests
+        env:
+          PYTHONPATH: src
+        run: |
+          .venv/bin/python -m pytest -v \
             tests/test_calibration.py \
             tests/test_calibration_matlab_parity.py \
             tests/test_config.py \
