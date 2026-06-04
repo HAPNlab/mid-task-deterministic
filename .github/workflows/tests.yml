@@ -1,0 +1,48 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Octave is the reference engine for the calibration MATLAB-parity test
+      # (tests/test_calibration_matlab_parity.py). Without it that test skips
+      # with a loud warning, so installing it here is what makes the parity
+      # check actually run in CI.
+      - name: Install Octave
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends octave
+          octave --version | head -1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install
+
+      # Install only this package + its non-PsychoPy needs for the logic tests.
+      # PsychoPy (a heavy GUI/audio dep) is deliberately NOT installed: it's
+      # fragile on headless CI and is only needed by the display-bound tests
+      # below, which are excluded. The calibration/config/scanner/sequences/
+      # ratings tests — including the MATLAB-parity test — need no display.
+      - name: Sync dependencies (no PsychoPy)
+        run: uv sync --no-install-package psychopy --inexact
+
+      # Tests that transitively import PsychoPy are skipped here (run them
+      # locally with a full `uv sync`): test_overlay, test_reward,
+      # test_trial_boundary, test_recorder.
+      - name: Run display-free tests
+        run: |
+          uv run --no-sync pytest -v \
+            tests/test_calibration.py \
+            tests/test_calibration_matlab_parity.py \
+            tests/test_config.py \
+            tests/test_scanner.py \
+            tests/test_sequences.py \
+            tests/test_ratings.py
