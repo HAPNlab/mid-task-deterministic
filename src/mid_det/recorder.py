@@ -130,6 +130,9 @@ class ScanPhase:
     pulse_ct: int
     phase_offset_global_time: float = 0.0
     phase_offset_trial_time: float = 0.0
+    trial_type: int = 0
+    polarity: str = ""
+    magnitude: int = 0
 
 
 BEHAVIORAL_COLUMNS: list[str] = [
@@ -150,7 +153,7 @@ TARGET_TIMING_COLUMNS: list[str] = [
 ]
 
 SCAN_LOG_COLUMNS: list[str] = [
-    "trial_n", "phase", "tr_n",
+    "trial_n", "trial_type", "polarity", "magnitude", "phase", "tr_n",
     "phase_onset_global_time", "phase_offset_global_time",
     "phase_onset_trial_time", "phase_offset_trial_time",
     "pulse_ct",

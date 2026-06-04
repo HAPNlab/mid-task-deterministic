@@ -476,6 +476,9 @@ def run_trial(
         )
         sp.phase_offset_global_time = end_global
         sp.phase_offset_trial_time = end_global - time_onset
+        sp.trial_type = trial_type
+        sp.polarity = polarity
+        sp.magnitude = magnitude
 
     record = TrialRecord(
         trial_n=trial_n,
