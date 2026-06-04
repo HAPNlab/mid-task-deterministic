@@ -143,7 +143,7 @@ data/
 
 ### scan_log CSV
 
-One row per trial phase: `trial_n`, `phase`, `tr_n`, `phase_global_time`, `phase_trial_time`, `pulse_ct`.
+One row per trial phase: `trial_n`, `phase`, `tr_n`, `phase_onset_global_time`, `phase_offset_global_time`, `phase_onset_trial_time`, `phase_offset_trial_time`, `pulse_ct`. The `*_offset_*` (phase end) columns are tiled: a phase's end equals the next phase's onset, and the final phase of a trial ends at the trial end.
 
 ## Quitting Early
 

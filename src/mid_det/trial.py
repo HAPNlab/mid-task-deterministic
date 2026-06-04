@@ -466,6 +466,17 @@ def run_trial(
     time_trial_end = global_clock.getTime()
     time_sched_end = nominal_time
 
+    # Backfill each phase's end = onset of the next phase (tiled timeline);
+    # the final phase ends at the trial end.
+    for i, sp in enumerate(scan_phases):
+        end_global = (
+            scan_phases[i + 1].phase_onset_global_time
+            if i + 1 < len(scan_phases)
+            else time_trial_end
+        )
+        sp.phase_offset_global_time = end_global
+        sp.phase_offset_trial_time = end_global - time_onset
+
     record = TrialRecord(
         trial_n=trial_n,
         trial_type=trial_type,
