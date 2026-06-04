@@ -33,5 +33,11 @@ def load_sequence(run_n: str) -> pd.DataFrame:
             raise ValueError(f"row {i}: polarity '{row['polarity']}' not in {config.POLARITIES}")
         if int(row["magnitude"]) not in config.MAGNITUDES:
             raise ValueError(f"row {i}: magnitude '{row['magnitude']}' not in {config.MAGNITUDES}")
+        pair = (row["polarity"], int(row["magnitude"]))
+        if pair not in config.TRIAL_TYPE_MAP:
+            raise ValueError(
+                f"row {i}: (polarity, magnitude) {pair} has no trial type in "
+                f"config.TRIAL_TYPE_MAP"
+            )
 
     return df.reset_index(drop=True)

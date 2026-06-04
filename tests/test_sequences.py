@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from mid_det import config
+from mid_det import config, sequences
 from mid_det.sequences import load_sequence
 
 
@@ -33,6 +33,25 @@ def test_polarity_and_magnitude_values_valid(run_n):
     df = load_sequence(run_n)
     assert df["polarity"].isin(config.POLARITIES).all()
     assert df["magnitude"].isin(config.MAGNITUDES).all()
+
+
+def test_unmapped_pair_rejected(tmp_path, monkeypatch):
+    """
+    A (polarity, magnitude) combo that is individually valid but absent from
+    TRIAL_TYPE_MAP must be rejected at load time, not crash mid-run at the
+    trial.py lookup. Guards against TRIAL_TYPE_MAP becoming a sparse grid.
+    """
+    # Drop ("gain", 0) from the map so the pair stays valid per-field (gain ∈
+    # POLARITIES, 0 ∈ MAGNITUDES) but has no trial type.
+    monkeypatch.setattr(sequences, "_SEQUENCES_DIR", tmp_path)
+    map_without_pair = {k: v for k, v in config.TRIAL_TYPE_MAP.items() if k != ("gain", 0)}
+    monkeypatch.setattr(config, "TRIAL_TYPE_MAP", map_without_pair)
+
+    (tmp_path / "run_99.csv").write_text(
+        "polarity,magnitude,n_iti\ngain,0,1\n"
+    )
+    with pytest.raises(ValueError, match=r"no trial type"):
+        load_sequence("99")
 
 
 # ── trial counts (main.m cues_b* arrays) ─────────────────────────────────────
