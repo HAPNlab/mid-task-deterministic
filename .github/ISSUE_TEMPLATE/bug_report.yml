@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a crash, incorrect stimuli/timing, or an output-file problem.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please include enough detail to reproduce it.
+        For timing or stimulus issues, exact steps and the affected trial/cue help a lot.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: When running mid-task-det, the target appeared for the wrong duration on high-difficulty trials...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Run `mid-task-det`
+        2. Enter subject ID `test01`, difficulty `high`
+        3. Observe the target on the first gain trial
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Which environment were you running in?
+      options:
+        - UV (development)
+        - Anaconda (production)
+        - Other (describe below)
+    validations:
+      required: true
+  - type: input
+    id: psychopy-version
+    attributes:
+      label: PsychoPy version
+      description: Output of `python -c "import psychopy; print(psychopy.__version__)"` (if applicable).
+      placeholder: "2024.2.4"
+  - type: input
+    id: os
+    attributes:
+      label: OS and Python version
+      placeholder: "macOS 14.5, Python 3.11"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      description: Paste any error output or relevant log/data files. This will be rendered as code.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I am on the latest `main` (or I noted my version above).
+          required: true

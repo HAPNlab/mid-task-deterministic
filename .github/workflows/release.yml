@@ -18,6 +18,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Guard the release: the tag, pyproject.toml version, and CHANGELOG.md must
+      # agree. Fail loudly rather than publish a mislabeled release.
+      #   - pyproject [project].version must equal the tag without the leading "v"
+      #   - CHANGELOG.md must contain a "## ..." heading for that version
+      - name: Verify version and changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+
+          pyproject_version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+          if [ "$pyproject_version" != "$version" ]; then
+            echo "::error::pyproject.toml version ($pyproject_version) does not match tag $GITHUB_REF_NAME (expected $version). Bump pyproject.toml before tagging."
+            exit 1
+          fi
+
+          if ! awk -v ver="$version" '
+            /^## / {
+              heading = $0
+              gsub(/[][]/, "", heading)
+              if (index(heading, ver)) { found = 1 }
+            }
+            END { exit found ? 0 : 1 }
+          ' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for $version. Add a '## $version' entry before tagging."
+            exit 1
+          fi
+
       # Pull the notes for this tag out of CHANGELOG.md. We match the heading
       # whose version equals the tag without the leading "v" (so tag v1.2.3 maps
       # to a "## [1.2.3]" / "## 1.2.3" heading) and emit everything up to the

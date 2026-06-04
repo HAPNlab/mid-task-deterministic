@@ -16,6 +16,7 @@ Unlike `mid-task`, this variant is **deterministic**:
 |----------|-------------|
 | [Usage Guide](docs/usage.md) | Running the task, startup dialog, keyboard controls, and output files |
 | [Development Guide](docs/development.md) | Developer setup, project structure, and key constants |
+| [Release Guide](docs/releasing.md) | Versioning (SemVer), verification, and how releases are published |
 
 ## Quick Start
 
