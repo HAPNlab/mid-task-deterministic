@@ -10,8 +10,22 @@ import random
 from collections.abc import Callable
 
 import pandas as pd
-from psychopy import core, logging, visual
-from psychopy.hardware import keyboard
+
+try:
+    from psychopy import core, logging, visual
+    from psychopy.hardware import keyboard
+except ModuleNotFoundError:
+    # Headless/CI without PsychoPy: keep this module importable so the pure-logic
+    # (_compute_reward) and timing (run_response, driven by a fake window/clock in
+    # tests) code stays testable. `core` is a namespace with the attributes those
+    # paths reference — tests patch core.Clock; real runs always have PsychoPy.
+    import types
+
+    visual = keyboard = None  # type: ignore[assignment]
+    logging = types.SimpleNamespace(exp=lambda *a, **k: None)  # type: ignore[assignment]
+    core = types.SimpleNamespace(  # type: ignore[assignment]
+        Clock=None, CountdownTimer=None, quit=lambda *a, **k: None
+    )
 
 from mid_det import config
 from mid_det.calibration import CalibrationState

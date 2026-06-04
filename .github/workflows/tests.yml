@@ -24,28 +24,21 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       # PsychoPy is deliberately NOT installed: it's a heavy GUI/audio dep whose
-      # transitive build (ffpyplayer → SDL headers) is fragile on headless CI,
-      # and it's only needed by the display-bound tests excluded below. The
-      # display-free modules under test import nothing beyond the stdlib except
-      # pandas (sequences.py), so we install just that + pytest and put `src` on
+      # transitive build (ffpyplayer → SDL headers) is fragile on headless CI.
+      # The source modules guard their psychopy imports (try/except), so the
+      # whole test suite imports and runs without it; only pandas is needed at
+      # runtime (sequences.py). We install just that + pytest and put `src` on
       # PYTHONPATH rather than resolving the project's full dependency graph.
       - name: Create venv and install minimal test deps
         run: |
           uv venv
           uv pip install pytest pandas
 
-      # Tests that transitively import PsychoPy are excluded here (run them
-      # locally with a full `uv sync`): test_overlay, test_reward,
-      # test_trial_boundary, test_recorder. Octave (installed above) lets the
-      # MATLAB-parity test actually run rather than skip.
-      - name: Run display-free tests
+      # tests/test_overlay.py is excluded: it's not an automated test (no test
+      # functions) but a manual `visual.Window` script that needs a live display
+      # and imports psychopy at module top. Everything else runs headless, incl.
+      # the MATLAB-parity test (Octave installed above lets it run, not skip).
+      - name: Run tests
         env:
           PYTHONPATH: src
-        run: |
-          .venv/bin/python -m pytest -v \
-            tests/test_calibration.py \
-            tests/test_calibration_matlab_parity.py \
-            tests/test_config.py \
-            tests/test_scanner.py \
-            tests/test_sequences.py \
-            tests/test_ratings.py
+        run: .venv/bin/python -m pytest -v --ignore=tests/test_overlay.py
