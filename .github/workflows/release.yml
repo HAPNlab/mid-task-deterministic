@@ -1,0 +1,54 @@
+name: release
+
+# Triggered by pushing a semver tag (e.g. v1.2.3 or v1.2.3-rc.1). The job pulls
+# the matching section out of CHANGELOG.md and publishes it as a draft GitHub
+# Release, attaching the auto-generated source code archives.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pull the notes for this tag out of CHANGELOG.md. We match the heading
+      # whose version equals the tag without the leading "v" (so tag v1.2.3 maps
+      # to a "## [1.2.3]" / "## 1.2.3" heading) and emit everything up to the
+      # next "## " heading. If no section is found we fall back to a generic note
+      # rather than failing the release.
+      - name: Extract release notes
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes_file="$(mktemp)"
+          awk -v ver="$version" '
+            $0 ~ "^## " {
+              if (found) exit
+              heading = $0
+              gsub(/[][]/, "", heading)
+              if (index(heading, ver)) { found = 1; next }
+            }
+            found { print }
+          ' CHANGELOG.md > "$notes_file"
+
+          if [ ! -s "$notes_file" ]; then
+            printf 'Release %s\n' "$GITHUB_REF_NAME" > "$notes_file"
+          fi
+
+          echo "file=$notes_file" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.file }}
+          draft: true
+          # Mark as prerelease when the tag carries an rc/alpha/beta suffix.
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') }}
