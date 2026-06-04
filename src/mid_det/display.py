@@ -12,7 +12,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from psychopy import visual
+try:
+    from psychopy import visual
+except ModuleNotFoundError:  # headless/CI without PsychoPy; only needed to build stimuli
+    visual = None  # type: ignore[assignment]
 
 from mid_det import config
 

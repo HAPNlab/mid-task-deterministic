@@ -2,6 +2,10 @@ This project uses UV for managing Python packages.
 
 It's recommended to use Python through UV, but if you need to, `python3` is available while `python` is not.
 
+The calibration MATLAB-parity test (`tests/test_calibration_matlab_parity.py`) needs GNU Octave (or
+MATLAB) on PATH to run the reference algorithm; install it with `brew install octave`. Without an
+engine the test skips with a loud warning rather than silently passing.
+
 ## Environments: UV (development) vs. Anaconda (production)
 
 - **UV is for development.** It is the canonical local workflow and the only one with a pinned

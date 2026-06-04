@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Octave is the reference engine for the calibration MATLAB-parity test
+      # (tests/test_calibration_matlab_parity.py). Without it that test skips
+      # with a loud warning, so installing it here is what makes the parity
+      # check actually run in CI.
+      - name: Install Octave
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends octave
+          octave --version | head -1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      # PsychoPy is deliberately NOT installed: it's a heavy GUI/audio dep whose
+      # transitive build (ffpyplayer → SDL headers) is fragile on headless CI.
+      # The source modules guard their psychopy imports (try/except), so the
+      # whole test suite imports and runs without it; only pandas is needed at
+      # runtime (sequences.py). We install just that + pytest and put `src` on
+      # PYTHONPATH rather than resolving the project's full dependency graph.
+      - name: Create venv and install minimal test deps
+        run: |
+          uv venv
+          uv pip install pytest pandas
+
+      # tests/test_overlay.py is excluded: it's not an automated test (no test
+      # functions) but a manual `visual.Window` script that needs a live display
+      # and imports psychopy at module top. Everything else runs headless, incl.
+      # the MATLAB-parity test (Octave installed above lets it run, not skip).
+      - name: Run tests
+        env:
+          PYTHONPATH: src
+        run: .venv/bin/python -m pytest -v --ignore=tests/test_overlay.py

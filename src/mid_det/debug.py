@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from psychopy import visual
+try:
+    from psychopy import visual
+except ModuleNotFoundError:  # headless/CI without PsychoPy; only needed to build the overlay
+    visual = None  # type: ignore[assignment]
 
 
 @dataclass
