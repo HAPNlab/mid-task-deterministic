@@ -51,7 +51,7 @@ def run_ratings_wizard() -> tuple[str, bool, str]:
     ).ask()
     if subject_id is None:
         _quit()
-    subject_id = subject_id.strip() or _SUBJECT_PLACEHOLDER
+    subject_id: str = subject_id.strip() or _SUBJECT_PLACEHOLDER
 
     show_instructions: bool | None = questionary.confirm(
         "Show instructions?", default=True, style=_QSTYLE

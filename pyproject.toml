@@ -16,6 +16,7 @@ dependencies = [
     "pandas>=2.0",
     "rich>=14.3.3",
     "questionary>=2.0",
+    "prompt_toolkit>=3.0",
     "mcculw>=1.0.0",
     "pyobjc-framework-quartz>=10; sys_platform == 'darwin'",
 ]

@@ -29,7 +29,7 @@ from rich.console import Console
 from mid_det import recorder, session
 from mid_det.ratings import core as rcore
 from mid_det.ratings import display as rdisplay
-from mid_det.ratings.wizard import run_ratings_wizard
+from mid_det.ratings.setup_wizard import run_ratings_wizard
 
 _PACKAGE_DIR = Path(__file__).resolve().parent          # src/mid_det/ratings/
 _PROJECT_ROOT = _PACKAGE_DIR.parent.parent.parent        # project root

@@ -100,13 +100,13 @@ def prompt_legacy_name(legacy_dir: Path, filename_for: Callable[[str], str]) -> 
 
     # Bottom toolbar: live preview of the resolved path as NAME is typed.
     def _toolbar():
-        name = get_app().current_buffer.text.strip()
-        if not name:
+        typed = get_app().current_buffer.text.strip()
+        if not typed:
             return FormattedText(
                 [("fg:ansired bold", " ✗  Name cannot be empty")]
             )
-        target = legacy_dir / filename_for(name)
-        return FormattedText([("fg:ansigreen bold", f" → saves as {target}")])
+        preview = legacy_dir / filename_for(typed)
+        return FormattedText([("fg:ansigreen bold", f" → saves as {preview}")])
 
     while True:
         raw = ""
@@ -119,7 +119,6 @@ def prompt_legacy_name(legacy_dir: Path, filename_for: Callable[[str], str]) -> 
             )
         except (KeyboardInterrupt, EOFError):
             _quit()
-            raise  # unreachable; tells PyCharm this branch never continues
         name = raw.strip()
         if not name:
             _rcon.print("[red]Name cannot be empty.[/red]")
@@ -136,10 +135,12 @@ def prompt_legacy_name(legacy_dir: Path, filename_for: Callable[[str], str]) -> 
         ).ask()
         if overwrite is None:
             _quit()
-            raise  # unreachable; tells PyCharm this branch never continues
         if overwrite:
             return name
         # else: loop and re-prompt for a different NAME
+    # Unreachable: the loop only exits via `return` or `_quit()`. Present so the
+    # type checker can see every path returns `str` (not `str | None`).
+    raise AssertionError("prompt_legacy_name loop exited unexpectedly")
 
 
 # ── Custom RT field ───────────────────────────────────────────────────────────

@@ -274,7 +274,7 @@ class LegacyMidCsvWriter:
         # MATLAB rt_vector: -2 = early press, -1 = miss/too-slow, else RT (seconds).
         if record.early_press:
             rt: float = -2
-        elif record.rt_ms == "":
+        elif isinstance(record.rt_ms, str):  # "" sentinel = miss/too-slow
             rt = -1
         else:
             rt = record.rt_ms / 1000
