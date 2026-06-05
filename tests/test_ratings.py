@@ -82,3 +82,44 @@ def test_write_ratings_csv(tmp_path):
 def test_ratings_in_valid_range():
     for r in range(1, core.N_ELS + 1):
         assert 1 <= core.clamp_slider(r, 0) <= core.N_ELS
+
+
+def test_legacy_gamble_names():
+    # magnitude 0/1/5 -> low/med/high; loss -> square, gain -> circle.
+    assert core.GAMBLE_NAMES == {
+        ("loss", 0): "lowsquare",
+        ("loss", 1): "medsquare",
+        ("loss", 5): "highsquare",
+        ("gain", 0): "lowcircle",
+        ("gain", 1): "medcircle",
+        ("gain", 5): "highcircle",
+    }
+
+
+def test_legacy_ratings_rows_order():
+    results = [
+        {"polarity": c.polarity, "magnitude": c.magnitude, "arousal": 5, "valence": 4}
+        for c in core.RATING_CUES
+    ]
+    rows = core.build_legacy_csv_rows(results)
+    assert rows[0] == ["gamble", "arousal", "valence"]
+    assert [r[0] for r in rows[1:]] == [
+        "lowsquare", "medsquare", "highsquare",
+        "lowcircle", "medcircle", "highcircle",
+    ]
+    # columns are gamble, arousal, valence (arousal before valence)
+    assert rows[1] == ["lowsquare", "5", "4"]
+
+
+def test_write_legacy_ratings_csv(tmp_path):
+    results = [
+        {"polarity": c.polarity, "magnitude": c.magnitude, "arousal": 4, "valence": 4}
+        for c in core.RATING_CUES
+    ]
+    out = tmp_path / "1_ratings.csv"
+    core.write_legacy_ratings_csv(out, results)
+
+    with open(out, newline="") as f:
+        read = list(csv.reader(f))
+    assert read[0] == ["gamble", "arousal", "valence"]
+    assert len(read) == 1 + len(core.RATING_CUES)

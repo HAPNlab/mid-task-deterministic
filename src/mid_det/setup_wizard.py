@@ -11,6 +11,8 @@ wizard that:
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
 from typing import NoReturn
 
 import questionary
@@ -32,6 +34,10 @@ _rcon = Console(stderr=True)
 
 # ── Styles ────────────────────────────────────────────────────────────────────
 
+# Placeholder subject ID — shown greyed-out and used as the fallback when the
+# field is left empty (handy for testing).
+_SUBJECT_PLACEHOLDER = "XXX000"
+
 # Match questionary's default palette so everything looks cohesive.
 _QSTYLE = questionary.Style(
     [
@@ -43,6 +49,7 @@ _QSTYLE = questionary.Style(
         ("selected", "fg:#cc5454"),
         ("separator", "fg:#6c6c6c"),
         ("instruction", "fg:#858585 italic"),
+        ("placeholder", "fg:#6c6c6c"),
     ]
 )
 
@@ -50,6 +57,7 @@ _QSTYLE = questionary.Style(
 _PT_STYLE = PtStyle.from_dict(
     {
         "prompt": "#ff9d00 bold",           # ❯ arrow: matches questionary answer
+        "placeholder": "#6c6c6c italic",    # greyed-out example, not submitted
         "bottom-toolbar": "bg:#1e1e1e #888888",
         "bottom-toolbar.text": "bg:#1e1e1e",
     }
@@ -72,6 +80,66 @@ def _nearest_frame_aligned(value_ms: float, frame_dur_ms: float) -> float:
 def _quit() -> NoReturn:
     from psychopy import core  # late import — avoids circular / slow startup
     core.quit()
+    raise SystemExit(0)  # unreachable; tells the type checker this never returns
+
+
+def prompt_legacy_name(legacy_dir: Path, filename_for: Callable[[str], str]) -> str:
+    """Prompt for the legacy-format file's NAME and guard against clobbering an
+    existing file (the legacy names aren't timestamped, so same subject/run can
+    collide). *filename_for* maps the entered NAME to the target filename.
+
+    Re-prompts until the resulting path is free or the operator confirms an
+    overwrite. Returns the chosen NAME.
+    """
+    # Print the label above the input field (the prompt itself is just "❯").
+    _rcon.print(
+        "[bold #5f819d]?[/bold #5f819d] [bold]Legacy filename[/bold]  "
+        "[dim]NAME is only part of the saved file[/dim]",
+        highlight=False,
+    )
+
+    # Bottom toolbar: live preview of the resolved path as NAME is typed.
+    def _toolbar():
+        name = get_app().current_buffer.text.strip()
+        if not name:
+            return FormattedText(
+                [("fg:ansired bold", " ✗  Name cannot be empty")]
+            )
+        target = legacy_dir / filename_for(name)
+        return FormattedText([("fg:ansigreen bold", f" → saves as {target}")])
+
+    while True:
+        raw = ""
+        try:
+            raw = _pt_prompt(
+                FormattedText([("class:prompt", "❯ ")]),
+                placeholder=HTML("<placeholder>e.g. 1</placeholder>"),
+                bottom_toolbar=_toolbar,
+                style=_PT_STYLE,
+            )
+        except (KeyboardInterrupt, EOFError):
+            _quit()
+            raise  # unreachable; tells PyCharm this branch never continues
+        name = raw.strip()
+        if not name:
+            _rcon.print("[red]Name cannot be empty.[/red]")
+            continue
+
+        target = legacy_dir / filename_for(name)
+        if not target.exists():
+            return name
+
+        overwrite: bool | None = questionary.confirm(
+            f"{target.name} already exists in {legacy_dir}/ — overwrite?",
+            default=False,
+            style=_QSTYLE,
+        ).ask()
+        if overwrite is None:
+            _quit()
+            raise  # unreachable; tells PyCharm this branch never continues
+        if overwrite:
+            return name
+        # else: loop and re-prompt for a different NAME
 
 
 # ── Custom RT field ───────────────────────────────────────────────────────────
@@ -249,11 +317,17 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     _rcon.print()
 
     # ── Session fields ────────────────────────────────────────────────────────
+    # Placeholder (not a default): shown greyed-out so production users type the
+    # real ID without clearing a field. Pressing Enter on an empty field falls
+    # back to the placeholder value — convenient for testing.
     subject_id: str | None = questionary.text(
-        "Subject ID", default="XXX000", style=_QSTYLE
+        "Subject ID",
+        placeholder=HTML(f"<placeholder>{_SUBJECT_PLACEHOLDER}</placeholder>"),
+        style=_QSTYLE,
     ).ask()
     if subject_id is None:
         _quit()
+    subject_id_str: str = subject_id.strip() or _SUBJECT_PLACEHOLDER
 
     run_n: str | None = questionary.select(
         "Task",
@@ -266,6 +340,7 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     ).ask()
     if run_n is None:
         _quit()
+    run_n_str: str = run_n
 
     fmri: bool | None = questionary.confirm(
         "fMRI session?", default=False, style=_QSTYLE
@@ -278,6 +353,12 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     ).ask()
     if show_instructions is None:
         _quit()
+
+    # ── Legacy-format filename ────────────────────────────────────────────────
+    legacy_name = prompt_legacy_name(
+        Path("data") / "legacy-fmt",
+        lambda n: f"{n}_b{run_n_str}.csv",
+    )
 
     # ── Timing fields ─────────────────────────────────────────────────────────
     _rcon.print()
@@ -315,10 +396,11 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     _rcon.print()
 
     return SessionInfo(
-        subject_id=subject_id,
+        subject_id=subject_id_str,
         fmri=fmri,
-        run_n=run_n,
+        run_n=run_n_str,
         show_instructions=show_instructions,
         base_rt_s=base_rt_ms / 1000.0,
         rt_change_s=rt_change_ms / 1000.0,
+        legacy_name=legacy_name,
     )

@@ -31,6 +31,7 @@ class SessionInfo:
     show_instructions: bool
     base_rt_s: float
     rt_change_s: float = config.RT_CHANGE_S   # staircase step; set by wizard
+    legacy_name: str = ""                     # NAME for legacy-fmt/{NAME}_b{run}.csv
 
 
 @dataclass

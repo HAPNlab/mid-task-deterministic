@@ -12,6 +12,13 @@ STUDY_TIMES_S: dict[str, float] = {
     "iti": 2.0,
 }
 
+# Nominal duration of the four fixed slides (cue+fixation+response+outcome) that
+# precede the ITI. Used as the drift baseline, mirroring MATLAB main.m's hardcoded
+# `- 8.0` (see trial.py timing_drift_ms).
+PRE_ITI_NOMINAL_S: float = sum(
+    STUDY_TIMES_S[k] for k in ("cue", "fixation", "response", "outcome")
+)
+
 # Polarity → shape (and reward sign). "polarity" is the gain/loss dimension;
 # kept distinct from the affective "valence" rated in the cue-ratings survey.
 POLARITIES: list[str] = ["gain", "loss"]

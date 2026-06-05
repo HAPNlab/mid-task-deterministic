@@ -182,6 +182,14 @@ def run() -> None:
     behavioral_writer = recorder.BehavioralCsvWriter(run_dir / f"behavioral_{file_stem}.csv")
     target_timing_writer = recorder.TargetTimingCsvWriter(run_dir / f"target_timing_{file_stem}.csv")
     scan_log_writer = recorder.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
+    legacy_dir = data_dir / "legacy-fmt"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    # MATLAB PartialParseData.m numbers block-2 trials starting at 43.
+    legacy_trial_offset = 42 if session_info.run_n == "2" else 0
+    legacy_writer = recorder.LegacyMidCsvWriter(
+        legacy_dir / f"{session_info.legacy_name}_b{session_info.run_n}.csv",
+        trial_offset=legacy_trial_offset,
+    )
     recorder.write_manifest(
         run_dir=run_dir,
         session_info=session_info,
@@ -314,6 +322,7 @@ def run() -> None:
 
             behavioral_writer.append(rec)
             target_timing_writer.append(target_timing)
+            legacy_writer.append(rec)
             for sp in scan_phases:
                 scan_log_writer.append(sp)
 
@@ -346,6 +355,7 @@ def run() -> None:
     behavioral_writer.close()
     target_timing_writer.close()
     scan_log_writer.close()
+    legacy_writer.close()
     logging.flush()
     win.close()
     core.quit()

@@ -117,7 +117,7 @@ def run() -> None:
     win_res, win, screen_diag = session.setup_screen()
 
     # ── WIZARD ───────────────────────────────────────────────────────────────
-    subject_id, show_instructions = run_ratings_wizard()
+    subject_id, show_instructions, legacy_name = run_ratings_wizard()
     session_time = datetime.now()
 
     rcon = Console(stderr=True)
@@ -197,7 +197,14 @@ def run() -> None:
     out_path = run_dir / f"{subject_id}_ratings.csv"
     rcore.write_ratings_csv(out_path, results)
 
+    # Legacy-format copy (gamble,arousal,valence) for downstream systems.
+    legacy_dir = _PROJECT_ROOT / "data" / "legacy-fmt"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    legacy_path = legacy_dir / f"{legacy_name}_ratings.csv"
+    rcore.write_legacy_ratings_csv(legacy_path, results)
+
     rcon.print(f"[bold green]Ratings saved[/bold green] -> [cyan]{out_path}[/cyan]")
+    rcon.print(f"[bold green]Legacy ratings saved[/bold green] -> [cyan]{legacy_path}[/cyan]")
     for r in results:
         rcon.print(
             f"  {r['polarity']:<4} ${r['magnitude']}  valence=[cyan]{r['valence']}[/cyan]  "

@@ -444,6 +444,13 @@ def run_trial(
     show_outcome(win, stimuli, kb, hit, reward_outcome, overlay)
     nominal_time += config.STUDY_TIMES_S["outcome"]
     calibration.record_outcome(polarity, magnitude, bool(hit))
+    # Drift is measured here — at the end of feedback, before the ITI — to match
+    # MATLAB main.m:329 (`GetSecs()-abs_start-onset_t(i)-8.0`). It is the per-trial
+    # over/under-run of the four fixed slides relative to this trial's own onset,
+    # i.e. the slippage the ITI is about to correct, NOT the post-correction
+    # residual. In scan mode the per-phase wait_for_tr() waits fall inside this
+    # window, so any TR-lock slack is included (same as the prior definition).
+    time_outcome_end = global_clock.getTime()
 
     # ── ITI ──────────────────────────────────────────────────────────────────
     for _ in range(n_iti_trs):
@@ -499,7 +506,9 @@ def run_trial(
         time_trial_end=round(time_trial_end, 6),
         trial_dur_ms=int(round((time_trial_end - time_onset) * 1000)),
         time_sched_end=round(time_sched_end, 6),
-        timing_drift_ms=round((time_trial_end - time_sched_end) * 1000, 2),
+        timing_drift_ms=round(
+            ((time_outcome_end - time_onset) - config.PRE_ITI_NOMINAL_S) * 1000, 2
+        ),
         n_iti_trs=n_iti_trs,
         total_trs=tr_within,
         subject_id=subject_id,
