@@ -14,7 +14,7 @@ from mid_det import config
 from mid_det._psychopy import core, keyboard, visual
 from mid_det.debug import DebugOverlay
 from mid_det.display import Stimuli, draw_fixation_x, draw_target
-from mid_det.phases import _check_quit
+from mid_det.phases import _poll_hotkeys
 
 
 class _FlipTimer:
@@ -242,7 +242,7 @@ def run_response(
         else:
             response.poll_target(kb, target_removed_at)
 
-        _check_quit(kb, overlay)
+        _poll_hotkeys(kb, overlay)
 
     return (
         response.hit,

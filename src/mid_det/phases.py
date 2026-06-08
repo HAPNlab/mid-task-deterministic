@@ -31,7 +31,7 @@ def run_cue(
     while timer.getTime() > 0:
         draw_cue(stimuli, polarity, magnitude)
         win.flip()
-        _check_quit(kb, overlay)
+        _poll_hotkeys(kb, overlay)
 
 
 def run_fixation(
@@ -47,7 +47,7 @@ def run_fixation(
     while timer.getTime() > 0:
         draw_fixation_x(stimuli)
         win.flip()
-        _check_quit(kb, overlay)
+        _poll_hotkeys(kb, overlay)
         # Poll in the loop so a press doesn't sit in the buffer until end-of-phase,
         # where a downstream kb.clearEvents() could discard it before inspection.
         if not early and kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
@@ -70,7 +70,7 @@ def show_outcome(
     while timer.getTime() > 0:
         draw_feedback(stimuli, hit, reward_outcome)
         win.flip()
-        _check_quit(kb, overlay)
+        _poll_hotkeys(kb, overlay)
 
 
 def run_iti(
@@ -87,10 +87,11 @@ def run_iti(
     while timer.getTime() > 0:
         draw_fixation_o(stimuli)
         win.flip()
-        _check_quit(kb, overlay)
+        _poll_hotkeys(kb, overlay)
 
 
-def _check_quit(kb: keyboard.Keyboard, overlay: DebugOverlay | None = None) -> None:
+def _poll_hotkeys(kb: keyboard.Keyboard, overlay: DebugOverlay | None = None) -> None:
+    """Per-frame operator-hotkey poll: quit on escape, toggle the debug overlay on f3."""
     if kb.getKeys(keyList=["escape"], waitRelease=False):
         core.quit()
     if overlay is not None and kb.getKeys(keyList=["f3"], waitRelease=False):
