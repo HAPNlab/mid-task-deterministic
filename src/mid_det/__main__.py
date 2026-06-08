@@ -179,7 +179,9 @@ def run() -> None:
     scan_log_writer = recorder.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
     legacy_dir = data_dir / "legacy-fmt"
     legacy_dir.mkdir(parents=True, exist_ok=True)
-    # MATLAB PartialParseData.m numbers block-2 trials starting at 43.
+    # MATLAB PartialParseData.m numbers trials continuously across blocks: block 1
+    # is trials 1-42, so block 2 continues from 43. Our trial_n restarts at 1 each
+    # run, so shift run 2 up by block 1's length (42) to restore that numbering.
     legacy_trial_offset = 42 if session_info.run_n == "2" else 0
     legacy_writer = recorder.LegacyMidCsvWriter(
         legacy_dir / f"{session_info.legacy_name}_b{session_info.run_n}.csv",
