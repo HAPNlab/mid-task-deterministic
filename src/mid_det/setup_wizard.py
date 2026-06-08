@@ -319,8 +319,8 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
 
     # ── Session fields ────────────────────────────────────────────────────────
     # Placeholder (not a default): shown greyed-out so production users type the
-    # real ID without clearing a field. Pressing Enter on an empty field falls
-    # back to the placeholder value — convenient for testing.
+    # real ID without having to clear the default value. Pressing Enter on an
+    # empty field falls back to the placeholder value — convenient for testing.
     subject_id: str | None = questionary.text(
         "Subject ID",
         placeholder=HTML(f"<placeholder>{_SUBJECT_PLACEHOLDER}</placeholder>"),
@@ -341,7 +341,7 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     ).ask()
     if run_n is None:
         _quit()
-    run_n_str: str = run_n
+    run_n: str = run_n
 
     fmri: bool | None = questionary.confirm(
         "fMRI session?", default=False, style=_QSTYLE
@@ -358,7 +358,7 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     # ── Legacy-format filename ────────────────────────────────────────────────
     legacy_name = prompt_legacy_name(
         Path("data") / "legacy-fmt",
-        lambda n: f"{n}_b{run_n_str}.csv",
+        lambda n: f"{n}_b{run_n}.csv",
     )
 
     # ── Timing fields ─────────────────────────────────────────────────────────
@@ -399,7 +399,7 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     return SessionInfo(
         subject_id=subject_id_str,
         fmri=fmri,
-        run_n=run_n_str,
+        run_n=run_n,
         show_instructions=show_instructions,
         base_rt_s=base_rt_ms / 1000.0,
         rt_change_s=rt_change_ms / 1000.0,
