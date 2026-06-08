@@ -19,6 +19,7 @@ dependencies = [
     "prompt_toolkit>=3.0",
     "mcculw>=1.0.0",
     "pyobjc-framework-quartz>=10; sys_platform == 'darwin'",
+    "glfw>=2.0; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]

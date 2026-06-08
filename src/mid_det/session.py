@@ -12,7 +12,7 @@ import platform
 import statistics
 
 import pyglet
-from psychopy import core, monitors, visual
+from psychopy import core, logging, monitors, visual
 from psychopy.hardware import keyboard
 from rich.console import Console
 
@@ -53,7 +53,7 @@ def setup_screen() -> tuple[list[int], visual.Window, ScreenDiagnostics]:
     win_res = [screens[-1].width, screens[-1].height]
     exp_mon = monitors.Monitor("exp_mon")
     exp_mon.setSizePix(win_res)
-    win = visual.Window(
+    win_kwargs = dict(
         size=win_res,
         screen=len(screens) - 1,
         allowGUI=True,
@@ -63,6 +63,21 @@ def setup_screen() -> tuple[list[int], visual.Window, ScreenDiagnostics]:
         color=(-1, -1, -1),
         waitBlanking=True,
     )
+    # Windows: request the GLFW backend so fullscr=True performs a true
+    # exclusive-fullscreen mode-set, letting the GPU scan out our swapchain
+    # directly (DWM "independent flip") instead of routing every frame through
+    # the desktop compositor — the source of the 2-4 vsync flip stretches seen
+    # on Windows runs. pyglet on Win10/11 only ever gets borderless fullscreen,
+    # which always composites through DWM. macOS presents deterministically on
+    # pyglet, so leave it on the default backend.
+    if platform.system() == "Windows":
+        try:
+            win = visual.Window(winType="glfw", **win_kwargs)
+        except Exception as exc:  # noqa: BLE001 — never abort a session over backend choice
+            logging.warning(f"GLFW backend unavailable ({exc}); falling back to pyglet")
+            win = visual.Window(**win_kwargs)
+    else:
+        win = visual.Window(**win_kwargs)
 
     # Explicitly enable VSYNC on the pyglet window.
     handle = getattr(win, "winHandle", None)
