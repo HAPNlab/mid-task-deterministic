@@ -100,7 +100,7 @@ def setup_screen() -> tuple[list[int], visual.Window, ScreenDiagnostics]:
     p99 = intervals_ms[int(0.99 * len(intervals_ms)) - 1]
     mx = intervals_ms[-1]
 
-    # Enable PsychoPy's frame interval recording so trial.run_response can read
+    # Enable PsychoPy's frame interval recording so response.run_response can read
     # win.nDroppedFrames and isolate on-screen drops from measurement artifacts.
     win.refreshThreshold = (median / 1000.0) * 1.5
     win.recordFrameIntervals = True

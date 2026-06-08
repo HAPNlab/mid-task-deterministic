@@ -1,260 +1,26 @@
 """
-Phase functions and run_trial().
-Uses psychopy.hardware.keyboard.Keyboard for accurate RT timestamping.
-No rendering objects are built here; no data is written here.
+Trial orchestration: run_trial() ties the per-phase loops together (cue →
+fixation → response → outcome → ITI), applies the reward rule, and builds the
+data records. The per-phase display loops live in phases.py and the
+timing-critical response window in response.py. No rendering objects are built
+here; no data is written here.
 """
 from __future__ import annotations
 
-import math
 import random
 from collections.abc import Callable
 
 import pandas as pd
 
-try:
-    from psychopy import core, logging, visual
-    from psychopy.hardware import keyboard
-except ModuleNotFoundError:
-    # Headless/CI without PsychoPy: keep this module importable so the pure-logic
-    # (_compute_reward) and timing (run_response, driven by a fake window/clock in
-    # tests) code stays testable. `core` is a namespace with the attributes those
-    # paths reference — tests patch core.Clock; real runs always have PsychoPy.
-    import types
-
-    visual = keyboard = None  # type: ignore[assignment]
-    logging = types.SimpleNamespace(exp=lambda *a, **k: None)  # type: ignore[assignment]
-    core = types.SimpleNamespace(  # type: ignore[assignment]
-        Clock=None, CountdownTimer=None, quit=lambda *a, **k: None
-    )
-
 from mid_det import config
+from mid_det._psychopy import core, keyboard, logging, visual
 from mid_det.calibration import CalibrationState
 from mid_det.debug import DebugOverlay
-from mid_det.display import (
-    Stimuli,
-    draw_cue,
-    draw_feedback,
-    draw_fixation_o,
-    draw_fixation_x,
-    draw_target,
-)
+from mid_det.display import Stimuli
+from mid_det.phases import run_cue, run_fixation, run_iti, show_outcome
 from mid_det.recorder import ScanPhase, TargetTimingRecord, TrialRecord
+from mid_det.response import run_response
 from mid_det.scanner import PulseCounter
-
-
-def run_cue(
-    win: visual.Window,
-    stimuli: Stimuli,
-    polarity: str,
-    magnitude: int,
-    kb: keyboard.Keyboard,
-    overlay: DebugOverlay | None = None,
-) -> None:
-    """Display cue for STUDY_TIMES_S['cue'] seconds."""
-    timer = core.CountdownTimer(config.STUDY_TIMES_S["cue"])
-    while timer.getTime() > 0:
-        draw_cue(stimuli, polarity, magnitude)
-        win.flip()
-        _check_quit(kb, overlay)
-
-
-def run_fixation(
-    win: visual.Window,
-    stimuli: Stimuli,
-    kb: keyboard.Keyboard,
-    overlay: DebugOverlay | None = None,
-) -> bool:
-    """Display fixation; return True if any response key was pressed (early press)."""
-    kb.clearEvents()
-    early = False
-    timer = core.CountdownTimer(config.STUDY_TIMES_S["fixation"])
-    while timer.getTime() > 0:
-        draw_fixation_x(stimuli)
-        win.flip()
-        _check_quit(kb, overlay)
-        # Poll in the loop so a press doesn't sit in the buffer until end-of-phase,
-        # where a downstream kb.clearEvents() could discard it before inspection.
-        if not early and kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
-            early = True
-    if not early and kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
-        early = True
-    return early
-
-
-def run_response(
-    win: visual.Window,
-    stimuli: Stimuli,
-    kb: keyboard.Keyboard,
-    jitter_s: float,
-    target_dur_s: float,
-    frame_dur_s: float,
-    early_press: bool,
-    overlay: DebugOverlay | None = None,
-) -> tuple[bool, float | None, bool, float | None, dict]:
-    """
-    Display response phase (STUDY_TIMES_S['response'] seconds total).
-    Target appears after jitter_s and stays visible for target_dur_s seconds.
-    Returns (hit, rt_s, early_press, target_removed_at, diagnostics).
-    """
-    phase_clock = core.Clock()
-    target_shown = False
-    target_onset_flip_done = False
-    target_removed_at: float | None = None
-    clock_reset_scheduled = False
-    hit = False
-    rt_s: float | None = None
-
-    # Measurement: use win.lastFrameT (the time PsychoPy stamps inside flip(),
-    # right after glFinish but before callOnFlip callbacks fire). This is a
-    # tighter proxy for the actual swap time than reading core.getTime() after
-    # flip() returns, which additionally absorbs callback-dispatch overhead.
-    response_start_flip_t: float | None = None
-    onset_flip_t: float | None = None
-    removal_flip_t: float | None = None
-    flip_iters = 0
-    dropped_at_onset: int | None = None
-    max_intra_flip_ms = 0.0
-    last_intra_flip_t: float | None = None
-
-    # Drain any presses queued between fixation end and now (e.g. during
-    # pulse_counter.wait_for_tr() or scheduler hiccups). Any EXP_KEYS press
-    # observed here belongs to the pre-target window and must count as early.
-    # Plain kb.clearEvents() would silently discard these.
-    if kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
-        early_press = True
-
-    # Derive frames-shown from kb.clock (reset on the onset flip) rather than
-    # counting loop iterations. Counting iterations assumes every flip() blocks
-    # exactly one vsync — true on macOS once VSYNC is verified, but Windows
-    # occasionally drops a frame, making one flip() span two vsyncs. The
-    # iteration counter would still tick once and the target would be visible
-    # for one extra frame. The clock advances with real wall time regardless,
-    # so round(elapsed / frame_dur) + 1 reflects actual displayed frames.
-    # round() rather than ceil() is intentional: frame-aligned durations (e.g.
-    # 17 * frame_dur) accumulate floating-point drift and evaluate to
-    # 17.000000000000004, which ceil() would promote to 18 — one phantom extra
-    # frame. round() snaps back to the correct integer.
-    n_target_frames = round(target_dur_s / frame_dur_s)
-
-    while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
-        t = phase_clock.getTime()
-
-        # Schedule kb.clock reset to fire on the next flip so t=0 aligns with target onset
-        if not clock_reset_scheduled and t >= jitter_s:
-            win.callOnFlip(kb.clock.reset)
-            clock_reset_scheduled = True
-            target_shown = True
-
-        if target_onset_flip_done and target_removed_at is None:
-            frames_shown = round(kb.clock.getTime() / frame_dur_s) + 1
-        else:
-            frames_shown = 0
-        should_remove = (
-            target_removed_at is None
-            and target_onset_flip_done
-            and frames_shown >= n_target_frames
-        )
-
-        # Draw before flip: omitting draw_target when should_remove clears the target on this flip
-        if target_shown and target_removed_at is None and not should_remove:
-            draw_target(stimuli)
-        elif not target_shown:
-            draw_fixation_x(stimuli)
-        win.flip()
-
-        # Stamp the first flip of the response phase so we can later report the
-        # actual pre-target jitter wall time (analog of target_dur_ms_actual).
-        if response_start_flip_t is None:
-            response_start_flip_t = win.lastFrameT
-
-        # Timestamp using win.lastFrameT, which PsychoPy sets inside flip()
-        # right after the GPU finishes the swap. core.getTime() after flip()
-        # returns would additionally include callOnFlip callback overhead.
-        if should_remove:
-            removal_flip_t = win.lastFrameT
-            target_removed_at = removal_flip_t - onset_flip_t if onset_flip_t else None
-            # Also measure the interval into the removal flip — a stretched
-            # removal flip is exactly the DWM-hiccup signature and must not be
-            # invisible to the diagnostic.
-            if last_intra_flip_t is not None:
-                delta_ms = (removal_flip_t - last_intra_flip_t) * 1000
-                if delta_ms > max_intra_flip_ms:
-                    max_intra_flip_ms = delta_ms
-        elif clock_reset_scheduled and not target_onset_flip_done:
-            target_onset_flip_done = True
-            onset_flip_t = win.lastFrameT
-            dropped_at_onset = getattr(win, "nDroppedFrames", 0)
-            last_intra_flip_t = onset_flip_t
-
-        if target_onset_flip_done and target_removed_at is None:
-            flip_iters += 1
-            now = win.lastFrameT
-            if last_intra_flip_t is not None:
-                delta_ms = (now - last_intra_flip_t) * 1000
-                if delta_ms > max_intra_flip_ms:
-                    max_intra_flip_ms = delta_ms
-            last_intra_flip_t = now
-
-        # Poll keys after flip so timestamps are relative to the most recent screen state
-        if not target_shown and not early_press:
-            if kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False):
-                early_press = True
-
-        if target_shown and not hit and rt_s is None and not early_press:
-            keys = kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False)
-            if keys:
-                rt = keys[0].rt
-                if rt < 0:
-                    early_press = True
-                else:
-                    rt_s = rt
-                    if target_removed_at is None or rt < target_removed_at:
-                        hit = True
-
-        _check_quit(kb, overlay)
-
-    if onset_flip_t is not None and removal_flip_t is not None:
-        onset_to_removal_wall_ms = round(
-            (removal_flip_t - onset_flip_t) * 1000, 2
-        )
-    else:
-        onset_to_removal_wall_ms = ""
-
-    if response_start_flip_t is not None and onset_flip_t is not None:
-        jitter_ms_actual = round((onset_flip_t - response_start_flip_t) * 1000, 2)
-    else:
-        jitter_ms_actual = ""
-
-    if dropped_at_onset is not None:
-        dropped_frames = int(getattr(win, "nDroppedFrames", 0) - dropped_at_onset)
-    else:
-        dropped_frames = 0
-
-    # Mark trial unclean if (a) PsychoPy detected any dropped frames during the
-    # response window, OR (b) the measured wall delta differs from the expected
-    # on-screen duration by more than half a frame. Either condition makes the
-    # exact target-display time unreliable for timing-sensitive analyses; flag
-    # for exclusion at analysis time. DWM-induced extra frames on Windows are
-    # an acknowledged unsolvable limitation — exclusion is the standard fix.
-    expected_dur_ms = n_target_frames * frame_dur_s * 1000
-    half_frame_ms = (frame_dur_s * 1000) / 2
-    timing_off_by_frame = (
-        isinstance(onset_to_removal_wall_ms, (int, float))
-        and abs(onset_to_removal_wall_ms - expected_dur_ms) > half_frame_ms
-    )
-    trial_clean = dropped_frames == 0 and not timing_off_by_frame
-
-    diagnostics = {
-        "flip_iters": flip_iters,
-        "n_target_frames": n_target_frames,
-        "dropped_frames": dropped_frames,
-        "onset_to_removal_wall_ms": onset_to_removal_wall_ms,
-        "max_flip_interval_ms": round(max_intra_flip_ms, 2),
-        "trial_clean": trial_clean,
-        "jitter_ms_actual": jitter_ms_actual,
-    }
-
-    return hit, rt_s, early_press, target_removed_at, diagnostics
 
 
 def _compute_reward(
@@ -279,46 +45,6 @@ def _compute_reward(
     if magnitude > 0:
         return f"-${magnitude}.00", total_earned - magnitude
     return "-$0.00", total_earned
-
-
-def show_outcome(
-    win: visual.Window,
-    stimuli: Stimuli,
-    kb: keyboard.Keyboard,
-    hit: bool,
-    reward_outcome: str,
-    overlay: DebugOverlay | None = None,
-) -> None:
-    """Display the outcome feedback for STUDY_TIMES_S['outcome'] seconds."""
-    timer = core.CountdownTimer(config.STUDY_TIMES_S["outcome"])
-    while timer.getTime() > 0:
-        draw_feedback(stimuli, hit, reward_outcome)
-        win.flip()
-        _check_quit(kb, overlay)
-
-
-def run_iti(
-    win: visual.Window,
-    stimuli: Stimuli,
-    kb: keyboard.Keyboard,
-    fix_dur_s: float,
-    overlay: DebugOverlay | None = None,
-) -> None:
-    """Display fixation for fix_dur_s seconds (drift-corrected by caller)."""
-    if fix_dur_s <= 0:
-        return
-    timer = core.CountdownTimer(fix_dur_s)
-    while timer.getTime() > 0:
-        draw_fixation_o(stimuli)
-        win.flip()
-        _check_quit(kb, overlay)
-
-
-def _check_quit(kb: keyboard.Keyboard, overlay: DebugOverlay | None = None) -> None:
-    if kb.getKeys(keyList=["escape"], waitRelease=False):
-        core.quit()
-    if overlay is not None and kb.getKeys(keyList=["f3"], waitRelease=False):
-        overlay.toggle()
 
 
 def run_trial(
