@@ -12,6 +12,13 @@ STUDY_TIMES_S: dict[str, float] = {
     "iti": 2.0,
 }
 
+# Nominal duration of the four fixed slides (cue+fixation+response+outcome) that
+# precede the ITI. Used as the drift baseline, mirroring MATLAB main.m's hardcoded
+# `- 8.0` (see trial.py timing_drift_ms).
+PRE_ITI_NOMINAL_S: float = sum(
+    STUDY_TIMES_S[k] for k in ("cue", "fixation", "response", "outcome")
+)
+
 # Polarity → shape (and reward sign). "polarity" is the gain/loss dimension;
 # kept distinct from the affective "valence" rated in the cue-ratings survey.
 POLARITIES: list[str] = ["gain", "loss"]
@@ -56,6 +63,12 @@ PRACTICE_CLOSING_FIX_DUR_S: float = 0.0
 # Matches MATLAB front-buffer timing: 0.25 + rand()*0.75 seconds.
 JITTER_MIN_S: float = 0.25
 JITTER_MAX_S: float = 1.0
+
+# Plausible display refresh rates. Used to sanity-check measured/calibrated
+# rates before we trust them for timing — anything outside this band is treated
+# as a failed measurement rather than a real refresh rate.
+MIN_REFRESH_HZ: float = 30.0
+MAX_REFRESH_HZ: float = 200.0
 
 # Scanner settings
 SCANNER_PULSE_RATE: int = 46

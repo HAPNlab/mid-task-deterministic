@@ -7,8 +7,7 @@ import pandas as pd
 
 from mid_det import config
 
-_PACKAGE_DIR = Path(__file__).parent          # src/mid_det/
-_PROJECT_ROOT = _PACKAGE_DIR.parent.parent    # project root
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]   # src/mid_det/io/ -> project root
 _SEQUENCES_DIR = _PROJECT_ROOT / "sequences"
 
 

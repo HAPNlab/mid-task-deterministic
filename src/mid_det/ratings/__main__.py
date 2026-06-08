@@ -4,7 +4,7 @@ Entry point for the cue-ratings survey: `mid-ratings-det`.
 A self-paced survey (no scanner sync, no frame-timing measurement). Each of the
 6 MID cues is rated on a VALENCE then an AROUSAL 7-point circle-slider scale,
 controlled with buttons 1 (left) / 2 (right) / 3 (select). Output is a single
-CSV: data/<subject>_ratings.csv with columns polarity,magnitude,arousal,valence.
+CSV: data/ratings_<subject>.csv with columns polarity,magnitude,arousal,valence.
 
 Ported from MATLAB RunRatings.m.
 """
@@ -26,10 +26,10 @@ from psychopy import visual
 from psychopy.hardware import keyboard
 from rich.console import Console
 
-from mid_det import recorder, session
+from mid_det.io import bootstrap, recording
 from mid_det.ratings import core as rcore
 from mid_det.ratings import display as rdisplay
-from mid_det.ratings.wizard import run_ratings_wizard
+from mid_det.ratings.setup_wizard import run_ratings_wizard
 
 _PACKAGE_DIR = Path(__file__).resolve().parent          # src/mid_det/ratings/
 _PROJECT_ROOT = _PACKAGE_DIR.parent.parent.parent        # project root
@@ -114,10 +114,10 @@ def _show_fixation(win: visual.Window, stim: rdisplay.RatingStimuli) -> None:
 
 def run() -> None:
     # ── SCREEN ───────────────────────────────────────────────────────────────
-    win_res, win, screen_diag = session.setup_screen()
+    win_res, win, screen_diag = bootstrap.setup_screen()
 
     # ── WIZARD ───────────────────────────────────────────────────────────────
-    subject_id, show_instructions = run_ratings_wizard()
+    subject_id, show_instructions, legacy_name = run_ratings_wizard()
     session_time = datetime.now()
 
     rcon = Console(stderr=True)
@@ -129,7 +129,7 @@ def run() -> None:
     ts = session_time.strftime("%Y%m%dT%H%M%S")
     run_dir = _PROJECT_ROOT / "data" / f"{subject_id}_ratings_{ts}"
     run_dir.mkdir(parents=True, exist_ok=True)
-    recorder.write_ratings_manifest(
+    recording.write_ratings_manifest(
         run_dir=run_dir,
         subject_id=subject_id,
         show_instructions=show_instructions,
@@ -194,10 +194,17 @@ def run() -> None:
 
     # ── WRITE CSV ────────────────────────────────────────────────────────────
     # (manifest.json was already written to run_dir at startup)
-    out_path = run_dir / f"{subject_id}_ratings.csv"
+    out_path = run_dir / f"ratings_{subject_id}.csv"
     rcore.write_ratings_csv(out_path, results)
 
+    # Legacy-format copy (gamble,arousal,valence) for downstream systems.
+    legacy_dir = _PROJECT_ROOT / "data" / "legacy-fmt"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    legacy_path = legacy_dir / f"{legacy_name}_ratings.csv"
+    rcore.write_legacy_ratings_csv(legacy_path, results)
+
     rcon.print(f"[bold green]Ratings saved[/bold green] -> [cyan]{out_path}[/cyan]")
+    rcon.print(f"[bold green]Legacy ratings saved[/bold green] -> [cyan]{legacy_path}[/cyan]")
     for r in results:
         rcon.print(
             f"  {r['polarity']:<4} ${r['magnitude']}  valence=[cyan]{r['valence']}[/cyan]  "

@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from mid_det import config
-from mid_det.calibration import CalibrationState
+from mid_det.task.calibration import CalibrationState
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

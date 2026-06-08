@@ -67,14 +67,31 @@ rather than from the lockfile.
 mid-task-deterministic/
 ├── src/
 │   └── mid_det/
-│       ├── __init__.py       # Version
-│       ├── __main__.py       # Entry point; wires all modules together
-│       ├── config.py         # All task constants (no cross-module imports)
-│       ├── display.py        # PsychoPy stimuli construction and draw helpers
-│       ├── recorder.py       # TrialRecord, ScanPhase, CSV writers, manifest
-│       ├── scanner.py        # HardwareBackend, EmulatedBackend, PulseCounter
-│       ├── session.py        # Startup dialog, screen setup, sequence loading
-│       └── trial.py          # Per-phase functions and run_trial()
+│       ├── __init__.py        # Version
+│       ├── __main__.py        # Entry point; wires all modules together
+│       ├── _psychopy.py       # PsychoPy import shim for headless testing
+│       ├── config.py          # All task constants (no cross-module imports)
+│       ├── task/              # The experiment run + on-screen presentation
+│       │   ├── trial.py           # run_trial(); ties the phases together
+│       │   ├── phases.py          # Fixed-duration per-phase display loops
+│       │   ├── response.py        # Timing-critical response window
+│       │   ├── flip_timer.py      # FlipTimer per-flip target-display diagnostics
+│       │   ├── calibration.py     # Per-cue adaptive target-window staircase
+│       │   ├── instructions.py    # Self-paced instruction presentation
+│       │   ├── display.py         # PsychoPy stimuli construction and draw helpers
+│       │   ├── console.py         # Rich live-view trial table
+│       │   └── debug.py           # F3-toggleable debug overlay HUD
+│       ├── io/                # Input/output boundary
+│       │   ├── bootstrap.py       # SessionInfo/ScreenDiagnostics, screen setup, run dir
+│       │   ├── setup_wizard.py    # Interactive terminal setup wizard
+│       │   ├── scanner.py         # HardwareBackend, EmulatedBackend, PulseCounter
+│       │   ├── sequences.py       # Sequence CSV loading and validation
+│       │   └── recording/         # Data recording
+│       │       ├── records.py         # TrialRecord/TargetTimingRecord/ScanPhase + schemas
+│       │       ├── csv_writers.py     # CsvWriter + behavioral/target-timing/scan-log writers
+│       │       ├── legacy.py          # LegacyMidCsvWriter + MATLAB-format helpers
+│       │       └── manifest.py        # write_manifest / write_ratings_manifest
+│       └── ratings/           # Standalone cue-ratings survey (mid-ratings-det)
 ├── sequences/
 │   ├── run_1.csv             # 54-trial sequence for run 1
 │   ├── run_2.csv             # 54-trial sequence for run 2
@@ -92,11 +109,8 @@ mid-task-deterministic/
 | Module | Responsibility |
 |--------|---------------|
 | `config.py` | Single source of truth for all timing, keyboard, scanner, and target-duration constants |
-| `session.py` | Startup GUI dialog, screen/monitor setup, sequence CSV loading, instruction display |
-| `display.py` | Build all PsychoPy `Visual` objects; draw helpers for each phase (circle/square cue with magnitude line) |
-| `scanner.py` | Abstract scanner backend; `HardwareBackend` (MCC DAQ) and `EmulatedBackend` (software clock) |
-| `trial.py` | `run_trial()` and per-phase functions (`run_cue`, `run_fixation`, `run_response`, `run_outcome`, `run_iti`) |
-| `recorder.py` | `TrialRecord` and `ScanPhase` dataclasses; CSV writers; `write_manifest()` |
+| `task/` | The experiment run: `trial.run_trial()`, per-phase loops (`phases.py`), the timing-critical `response.py` + `flip_timer.py`, the adaptive `calibration.py`, on-screen `display.py`/`instructions.py`, and operator UI (`console.py`, `debug.py`) |
+| `io/` | The I/O boundary: session `bootstrap.py` (screen setup, run dir, `SessionInfo`/`ScreenDiagnostics`), the terminal `setup_wizard.py`, `scanner.py` hardware, `sequences.py` loading, and the `recording/` package (records, CSV writers, legacy MATLAB format, manifests) |
 | `__main__.py` | Orchestration: init → instructions → wait for scan → trial loop → cleanup |
 
 ## Relationship to `mid-task`

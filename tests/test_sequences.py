@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import pytest
 
-from mid_det import config, sequences
-from mid_det.sequences import load_sequence
+from mid_det import config
+from mid_det.io import sequences
+from mid_det.io.sequences import load_sequence
 
 
 # ── schema ────────────────────────────────────────────────────────────────────

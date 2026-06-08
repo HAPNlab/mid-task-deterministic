@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from mid_det import config
-from mid_det.calibration import CalibrationState
+from mid_det.task.calibration import CalibrationState
 
 _REF_DIR = Path(__file__).parent / "matlab_ref"
 

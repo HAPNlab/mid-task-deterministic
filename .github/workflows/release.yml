@@ -44,6 +44,14 @@ jobs:
             exit 1
           fi
 
+      # Guard against a stale lockfile: uv.lock must agree with pyproject.toml.
+      # `uv lock --check` fails if the lock is out of date (e.g. the version was
+      # bumped in pyproject.toml but uv.lock was never re-locked to match).
+      - name: Verify uv.lock is in sync with pyproject.toml
+        uses: astral-sh/setup-uv@v5
+      - name: uv lock --check
+        run: uv lock --check
+
       # Pull the notes for this tag out of CHANGELOG.md. We match the heading
       # whose version equals the tag without the leading "v" (so tag v1.2.3 maps
       # to a "## [1.2.3]" / "## 1.2.3" heading) and emit everything up to the

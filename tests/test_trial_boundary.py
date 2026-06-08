@@ -1,5 +1,5 @@
 """
-Deterministic boundary tests for trial.run_response hit/miss classification.
+Deterministic boundary tests for response.run_response hit/miss classification.
 
 The concern these tests pin down: a keypress that physically lands while the
 target is still on screen — including the *very last* visible frame — must be
@@ -24,7 +24,8 @@ from __future__ import annotations
 
 import pytest
 
-from mid_det import config, trial
+from mid_det import config
+from mid_det.task import response
 
 FRAME_DUR = 0.01
 JITTER_S = 0.025
@@ -69,7 +70,7 @@ class _FakeWindow:
     def flip(self) -> None:
         # Advance, then stamp lastFrameT, then fire callbacks. This mirrors
         # PsychoPy: lastFrameT is set right after the swap, before callOnFlip
-        # callbacks run (see trial.run_response comments).
+        # callbacks run (see response.run_response comments).
         self._v.t += self._frame_dur
         self.lastFrameT = self._v.t
         cbs, self._cbs = self._cbs, []
@@ -125,12 +126,12 @@ def _drive(presses, *, early_press=False, monkeypatch):
 
     # Target draws need a real window; patch them out — geometry is irrelevant
     # to the timing classification under test.
-    monkeypatch.setattr(trial, "draw_target", lambda *a, **k: None)
-    monkeypatch.setattr(trial, "draw_fixation_x", lambda *a, **k: None)
+    monkeypatch.setattr(response, "draw_target", lambda *a, **k: None)
+    monkeypatch.setattr(response, "draw_fixation_x", lambda *a, **k: None)
     # phase_clock = core.Clock() inside run_response -> bind to virtual time.
-    monkeypatch.setattr(trial.core, "Clock", lambda *a, **k: _FakeClock(virtual))
+    monkeypatch.setattr(response.core, "Clock", lambda *a, **k: _FakeClock(virtual))
 
-    return trial.run_response(
+    return response.run_response(
         win,
         object(),  # stimuli: unused once draws are patched out
         kb,
@@ -194,6 +195,21 @@ def test_no_press_is_miss(monkeypatch):
     assert rt_s is None
     assert early is False
     assert removed_at == pytest.approx(EXPECTED_REMOVED_AT, abs=1e-9)
+
+
+def test_response_diagnostics(monkeypatch):
+    # Pin the full diagnostics dict so the refactor is provably behavior-preserving.
+    # On the virtual clock the onset flip lands at t=0.04 and removal at t=0.09.
+    _, _, _, removed_at, diag = _drive([], monkeypatch=monkeypatch)
+    assert removed_at == pytest.approx(0.05, abs=1e-9)
+    assert diag["n_target_frames"] == 5
+    assert diag["flip_iters"] == 5
+    assert diag["onset_to_removal_wall_ms"] == pytest.approx(50.0)
+    # onset snaps to the next frame boundary after jitter (0.025 -> 0.04)
+    assert diag["jitter_ms_actual"] == pytest.approx(30.0)
+    assert diag["dropped_frames"] == 0
+    assert diag["max_flip_interval_ms"] == pytest.approx(10.0)
+    assert diag["trial_clean"] == 1
 
 
 def test_just_below_and_just_above_removal_boundary(monkeypatch):

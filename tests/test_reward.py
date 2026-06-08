@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from mid_det.trial import _compute_reward
+from mid_det.task.trial import _compute_reward
 
 
 @pytest.mark.parametrize(

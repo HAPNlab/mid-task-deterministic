@@ -20,10 +20,12 @@ prefs.hardware["keyboardBackend"] = "ptb"
 from psychopy.hardware import keyboard
 from rich.console import Console
 
-from mid_det import config, display, recorder, scanner, sequences, session, setup_wizard, trial
-from mid_det.calibration import CalibrationState
-from mid_det.console import TrialLiveView
-from mid_det.debug import DebugOverlay, DebugState
+from mid_det import config
+from mid_det.task import display, instructions, trial
+from mid_det.io import bootstrap, recording, scanner, sequences, setup_wizard
+from mid_det.task.calibration import CalibrationState
+from mid_det.task.console import TrialLiveView
+from mid_det.task.debug import DebugOverlay, DebugState
 
 
 def _raise_process_priority() -> str | None:
@@ -58,18 +60,13 @@ def run() -> None:
     # ── SCREEN & FRAME RATE ──────────────────────────────────────────────────
     # Open the window first so we have a real frame duration to pass into the
     # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
-    win_res, win, screen_diag = session.setup_screen()
-
-    # Warm-up flips before frame-rate measurement: PsychoPy's detectingFrameDrops
-    # doc notes drops are common during startup as the GPU/driver settle.
-    for _ in range(30):
-        win.flip()
+    win_res, win, screen_diag = bootstrap.setup_screen()
 
     if args.fps is not None:
         frame_rate: float = args.fps
         frame_dur_s: float = 1.0 / args.fps
         fps_source = "specified"
-    elif 1000.0 / 200.0 <= screen_diag.calib_median_ms <= 1000.0 / 30.0:
+    elif 1000.0 / config.MAX_REFRESH_HZ <= screen_diag.calib_median_ms <= 1000.0 / config.MIN_REFRESH_HZ:
         # Prefer the 120-flip VSYNC-calibration median: it's a more reliable
         # estimator than getActualFrameRate(), and the response loop's
         # `round(t / frame_dur_s)` termination is sensitive to small drift in
@@ -83,7 +80,7 @@ def run() -> None:
         # than silently degrading — a guessed rate would corrupt every target
         # duration. Use --fps to override.
         measured_fps = win.getActualFrameRate()
-        if measured_fps is None or not (30.0 <= measured_fps <= 200.0):
+        if measured_fps is None or not (config.MIN_REFRESH_HZ <= measured_fps <= config.MAX_REFRESH_HZ):
             win.close()
             raise RuntimeError(
                 f"Could not measure a stable refresh rate "
@@ -101,7 +98,7 @@ def run() -> None:
 
     # ── LOGGING ──────────────────────────────────────────────────────────────
     data_dir = Path("data")
-    run_dir = session.make_run_dir(data_dir, session_info, session_time)
+    run_dir = bootstrap.make_run_dir(data_dir, session_info, session_time)
     logging.LogFile(str(run_dir / "experiment.log"), level=logging.EXP)
     logging.console.setLevel(logging.WARNING)
 
@@ -179,10 +176,20 @@ def run() -> None:
 
     # ── SETUP OUTPUT FILES ───────────────────────────────────────────────────
     file_stem = f"{session_info.subject_id}_run{session_info.run_n}"
-    behavioral_writer = recorder.BehavioralCsvWriter(run_dir / f"behavioral_{file_stem}.csv")
-    target_timing_writer = recorder.TargetTimingCsvWriter(run_dir / f"target_timing_{file_stem}.csv")
-    scan_log_writer = recorder.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
-    recorder.write_manifest(
+    behavioral_writer = recording.BehavioralCsvWriter(run_dir / f"behavioral_{file_stem}.csv")
+    target_timing_writer = recording.TargetTimingCsvWriter(run_dir / f"target_timing_{file_stem}.csv")
+    scan_log_writer = recording.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
+    legacy_dir = data_dir / "legacy-fmt"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    # MATLAB PartialParseData.m numbers trials continuously across blocks: block 1
+    # is trials 1-42, so block 2 continues from 43. Our trial_n restarts at 1 each
+    # run, so shift run 2 up by block 1's length (42) to restore that numbering.
+    legacy_trial_offset = 42 if session_info.run_n == "2" else 0
+    legacy_writer = recording.LegacyMidCsvWriter(
+        legacy_dir / f"{session_info.legacy_name}_b{session_info.run_n}.csv",
+        trial_offset=legacy_trial_offset,
+    )
+    recording.write_manifest(
         run_dir=run_dir,
         session_info=session_info,
         session_time=session_time,
@@ -212,7 +219,7 @@ def run() -> None:
 
     # ── INSTRUCTIONS ─────────────────────────────────────────────────────────
     if session_info.show_instructions:
-        session.display_instructions(win, stimuli_obj, session_info, kb, rcon)
+        instructions.display_instructions(win, stimuli_obj, session_info, kb, rcon)
 
     # ── PULSE COUNTER ────────────────────────────────────────────────────────
     backend = scanner.make_backend(session_info.fmri)
@@ -314,6 +321,7 @@ def run() -> None:
 
             behavioral_writer.append(rec)
             target_timing_writer.append(target_timing)
+            legacy_writer.append(rec)
             for sp in scan_phases:
                 scan_log_writer.append(sp)
 
@@ -346,6 +354,7 @@ def run() -> None:
     behavioral_writer.close()
     target_timing_writer.close()
     scan_log_writer.close()
+    legacy_writer.close()
     logging.flush()
     win.close()
     core.quit()

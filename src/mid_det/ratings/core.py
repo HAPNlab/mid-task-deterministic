@@ -97,3 +97,36 @@ def write_ratings_csv(path: Path, results: list[dict]) -> None:
     """Write the ratings CSV (polarity,magnitude,arousal,valence) to *path*."""
     with open(path, "w", newline="") as f:
         csv.writer(f).writerows(build_csv_rows(results))
+
+
+# ── Legacy format (downstream-system compatibility) ───────────────────────────
+# Old MATLAB layout: a single "gamble" name column instead of polarity+magnitude,
+# columns gamble,arousal,valence. magnitude 0/1/5 -> low/med/high; loss -> square,
+# gain -> circle (matches config.POLARITY_SHAPE).
+_MAGNITUDE_SIZE: dict[int, str] = {0: "low", 1: "med", 5: "high"}
+_POLARITY_SHAPE: dict[str, str] = {"loss": "square", "gain": "circle"}
+
+GAMBLE_NAMES: dict[tuple[str, int], str] = {
+    (cue.polarity, cue.magnitude): (
+        _MAGNITUDE_SIZE[cue.magnitude] + _POLARITY_SHAPE[cue.polarity]
+    )
+    for cue in RATING_CUES
+}
+
+LEGACY_RATINGS_HEADER: list[str] = ["gamble", "arousal", "valence"]
+
+
+def build_legacy_csv_rows(results: list[dict]) -> list[list[str]]:
+    """Build legacy CSV rows (header + one per result) with a single gamble-name
+    column, in the order *results* are given (RATING_CUES order)."""
+    rows: list[list[str]] = [list(LEGACY_RATINGS_HEADER)]
+    for r in results:
+        gamble = GAMBLE_NAMES[(r["polarity"], r["magnitude"])]
+        rows.append([gamble, str(r["arousal"]), str(r["valence"])])
+    return rows
+
+
+def write_legacy_ratings_csv(path: Path, results: list[dict]) -> None:
+    """Write the legacy ratings CSV (gamble,arousal,valence) to *path*."""
+    with open(path, "w", newline="") as f:
+        csv.writer(f).writerows(build_legacy_csv_rows(results))

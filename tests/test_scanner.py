@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from mid_det import config
-from mid_det.scanner import PulseCounter
+from mid_det.io.scanner import PulseCounter
 
 
 class FakeBackend:
