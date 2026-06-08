@@ -60,11 +60,6 @@ def run() -> None:
     # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
     win_res, win, screen_diag = session.setup_screen()
 
-    # Warm-up flips before frame-rate measurement: PsychoPy's detectingFrameDrops
-    # doc notes drops are common during startup as the GPU/driver settle.
-    for _ in range(30):
-        win.flip()
-
     if args.fps is not None:
         frame_rate: float = args.fps
         frame_dur_s: float = 1.0 / args.fps

@@ -83,7 +83,12 @@ def setup_screen() -> tuple[list[int], visual.Window, ScreenDiagnostics]:
     # percentile is well above one frame period, vsync is not actually blocking
     # — typical on Windows under DWM composition or borderless fullscreen.
     intervals_ms: list[float] = []
-    win.flip()  # warm-up; first interval after a stale context can be misleading
+    # Warm-up flips before measurement: PsychoPy's detectingFrameDrops doc notes
+    # drops are common during startup as the GPU/driver/compositor settle. Run
+    # these before the calibration loop so the median feeding frame_dur_s is
+    # measured on a settled context, not a cold one.
+    for _ in range(30):
+        win.flip()
     last_t = core.getTime()
     for _ in range(120):
         win.flip()
@@ -96,7 +101,7 @@ def setup_screen() -> tuple[list[int], visual.Window, ScreenDiagnostics]:
     mx = intervals_ms[-1]
 
     # Enable PsychoPy's frame interval recording so trial.run_response can read
-    # win.nDroppedFrames and isolate on-screen drops from measurement artefacts.
+    # win.nDroppedFrames and isolate on-screen drops from measurement artifacts.
     win.refreshThreshold = (median / 1000.0) * 1.5
     win.recordFrameIntervals = True
 
