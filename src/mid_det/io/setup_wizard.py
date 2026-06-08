@@ -28,7 +28,7 @@ from rich.rule import Rule
 from rich.text import Text
 
 from mid_det import config
-from mid_det.session import SessionInfo
+from mid_det.io.bootstrap import SessionInfo
 
 _rcon = Console(stderr=True)
 

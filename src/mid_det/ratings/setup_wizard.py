@@ -1,7 +1,7 @@
 """
 Trimmed interactive setup wizard for the cue-ratings survey.
 
-Reuses the styling and quit helpers from mid_det.setup_wizard; prompts only for
+Reuses the styling and quit helpers from mid_det.io.setup_wizard; prompts only for
 Subject ID and whether to show instructions (no fmri/run/timing fields).
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from prompt_toolkit.formatted_text import HTML
 from rich.panel import Panel
 from rich.text import Text
 
-from mid_det.setup_wizard import (
+from mid_det.io.setup_wizard import (
     _QSTYLE,
     _SUBJECT_PLACEHOLDER,
     _quit,

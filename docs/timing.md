@@ -23,7 +23,7 @@ should_remove = (
 
 `frame_dur_s` comes from `win.getActualFrameRate()`. If PsychoPy can't get a stable measurement (returns `None`, or a value outside 30–200 Hz), `__main__.run()` raises `RuntimeError` rather than guessing — a wrong frame period silently corrupts every target duration. The user can override with `--fps <hz>` if they know the refresh rate but VSYNC measurement is broken (e.g. macOS dev rigs, where the Cocoa compositor doesn't honor `set_vsync(True)`).
 
-`session.py:setup_screen` passes `waitBlanking=True` and calls `winHandle.set_vsync(True)` so production Windows rigs flip on VSYNC.
+`io/bootstrap.py:setup_screen` passes `waitBlanking=True` and calls `winHandle.set_vsync(True)` so production Windows rigs flip on VSYNC.
 
 ### macOS caveat
 

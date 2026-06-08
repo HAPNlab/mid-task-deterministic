@@ -14,13 +14,13 @@ import pandas as pd
 
 from mid_det import config
 from mid_det._psychopy import core, keyboard, logging, visual
-from mid_det.calibration import CalibrationState
-from mid_det.debug import DebugOverlay
-from mid_det.display import Stimuli
-from mid_det.phases import run_cue, run_fixation, run_iti, show_outcome
-from mid_det.recorder import ScanPhase, TargetTimingRecord, TrialRecord
-from mid_det.response import run_response
-from mid_det.scanner import PulseCounter
+from mid_det.task.calibration import CalibrationState
+from mid_det.task.debug import DebugOverlay
+from mid_det.task.display import Stimuli
+from mid_det.task.phases import run_cue, run_fixation, run_iti, show_outcome
+from mid_det.io.recording import ScanPhase, TargetTimingRecord, TrialRecord
+from mid_det.task.response import run_response
+from mid_det.io.scanner import PulseCounter
 
 
 def _compute_reward(

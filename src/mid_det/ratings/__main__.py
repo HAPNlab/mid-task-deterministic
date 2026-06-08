@@ -26,7 +26,7 @@ from psychopy import visual
 from psychopy.hardware import keyboard
 from rich.console import Console
 
-from mid_det import recorder, session
+from mid_det.io import bootstrap, recording
 from mid_det.ratings import core as rcore
 from mid_det.ratings import display as rdisplay
 from mid_det.ratings.setup_wizard import run_ratings_wizard
@@ -114,7 +114,7 @@ def _show_fixation(win: visual.Window, stim: rdisplay.RatingStimuli) -> None:
 
 def run() -> None:
     # ── SCREEN ───────────────────────────────────────────────────────────────
-    win_res, win, screen_diag = session.setup_screen()
+    win_res, win, screen_diag = bootstrap.setup_screen()
 
     # ── WIZARD ───────────────────────────────────────────────────────────────
     subject_id, show_instructions, legacy_name = run_ratings_wizard()
@@ -129,7 +129,7 @@ def run() -> None:
     ts = session_time.strftime("%Y%m%dT%H%M%S")
     run_dir = _PROJECT_ROOT / "data" / f"{subject_id}_ratings_{ts}"
     run_dir.mkdir(parents=True, exist_ok=True)
-    recorder.write_ratings_manifest(
+    recording.write_ratings_manifest(
         run_dir=run_dir,
         subject_id=subject_id,
         show_instructions=show_instructions,

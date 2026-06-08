@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from psychopy import visual
 
 from mid_det import config
-from mid_det.display import _LINE_Y_FRAC
+from mid_det.task.display import _LINE_Y_FRAC
 from mid_det.ratings import core
 
 # ── Layout constants (height units; screen spans −0.5…+0.5) ──────────────────

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from mid_det import config
 from mid_det._psychopy import core, keyboard, visual
-from mid_det.debug import DebugOverlay
-from mid_det.display import (
+from mid_det.task.debug import DebugOverlay
+from mid_det.task.display import (
     Stimuli,
     draw_cue,
     draw_feedback,

@@ -24,7 +24,8 @@ from __future__ import annotations
 
 import pytest
 
-from mid_det import config, response
+from mid_det import config
+from mid_det.task import response
 
 FRAME_DUR = 0.01
 JITTER_S = 0.025

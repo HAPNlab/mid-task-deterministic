@@ -9,15 +9,15 @@ from pathlib import Path
 
 import pytest
 
-from mid_det.recorder import (
+from mid_det.io.recording import (
     BEHAVIORAL_COLUMNS,
     LEGACY_MID_COLUMNS,
     BehavioralCsvWriter,
     LegacyMidCsvWriter,
     TrialRecord,
-    _num2str,
     write_ratings_manifest,
 )
+from mid_det.io.recording.legacy import _num2str
 
 
 @pytest.mark.parametrize(
