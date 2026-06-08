@@ -4,7 +4,7 @@ Entry point for the cue-ratings survey: `mid-ratings-det`.
 A self-paced survey (no scanner sync, no frame-timing measurement). Each of the
 6 MID cues is rated on a VALENCE then an AROUSAL 7-point circle-slider scale,
 controlled with buttons 1 (left) / 2 (right) / 3 (select). Output is a single
-CSV: data/<subject>_ratings.csv with columns polarity,magnitude,arousal,valence.
+CSV: data/ratings_<subject>.csv with columns polarity,magnitude,arousal,valence.
 
 Ported from MATLAB RunRatings.m.
 """
@@ -194,7 +194,7 @@ def run() -> None:
 
     # ── WRITE CSV ────────────────────────────────────────────────────────────
     # (manifest.json was already written to run_dir at startup)
-    out_path = run_dir / f"{subject_id}_ratings.csv"
+    out_path = run_dir / f"ratings_{subject_id}.csv"
     rcore.write_ratings_csv(out_path, results)
 
     # Legacy-format copy (gamble,arousal,valence) for downstream systems.
