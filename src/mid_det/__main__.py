@@ -64,7 +64,7 @@ def run() -> None:
         frame_rate: float = args.fps
         frame_dur_s: float = 1.0 / args.fps
         fps_source = "specified"
-    elif 1000.0 / 200.0 <= screen_diag.calib_median_ms <= 1000.0 / 30.0:
+    elif 1000.0 / config.MAX_REFRESH_HZ <= screen_diag.calib_median_ms <= 1000.0 / config.MIN_REFRESH_HZ:
         # Prefer the 120-flip VSYNC-calibration median: it's a more reliable
         # estimator than getActualFrameRate(), and the response loop's
         # `round(t / frame_dur_s)` termination is sensitive to small drift in
@@ -78,7 +78,7 @@ def run() -> None:
         # than silently degrading — a guessed rate would corrupt every target
         # duration. Use --fps to override.
         measured_fps = win.getActualFrameRate()
-        if measured_fps is None or not (30.0 <= measured_fps <= 200.0):
+        if measured_fps is None or not (config.MIN_REFRESH_HZ <= measured_fps <= config.MAX_REFRESH_HZ):
             win.close()
             raise RuntimeError(
                 f"Could not measure a stable refresh rate "

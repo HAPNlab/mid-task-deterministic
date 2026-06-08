@@ -64,6 +64,12 @@ PRACTICE_CLOSING_FIX_DUR_S: float = 0.0
 JITTER_MIN_S: float = 0.25
 JITTER_MAX_S: float = 1.0
 
+# Plausible display refresh rates. Used to sanity-check measured/calibrated
+# rates before we trust them for timing — anything outside this band is treated
+# as a failed measurement rather than a real refresh rate.
+MIN_REFRESH_HZ: float = 30.0
+MAX_REFRESH_HZ: float = 200.0
+
 # Scanner settings
 SCANNER_PULSE_RATE: int = 46
 BOARD_NUM: int = 0
