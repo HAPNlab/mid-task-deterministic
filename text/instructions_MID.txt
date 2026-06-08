@@ -1,6 +1,4 @@
-In this task, you can win or avoid losing money if you are quick enough. Your task is to press a button when you see the white triangle.
-On trials where the triangle is preceded by a circle, you will win the amount shown if you press the key while the triangle is on the screen.
-On trials where the triangle is preceded by a square, you will avoid losing the amount shown if you press the key while the triangle is on the screen.
-The amount shown on each cue may be $0, $1, or $5. A line across the shape indicates the magnitude: near the bottom means $0, through the middle means $1, near the top means $5.
-The triangle will be shown for a different duration on each trial. Some trials will give you more time to respond than others; simply do your best to press the key while the triangle is visible.
-After each trial, you will see your outcome. We will add whatever you win, and subtract whatever you lose, from the amount that we pay you today. If you have questions, please ask the experimenter now.
+In this experiment you will respond as quickly as possible to earn money. You will see a cue indicating how much money you can win or avoid losing. After this cue, a triangle will appear. Hit a button as fast as you can when the triangle appears to win. Press any button to continue the instructions.
+Cues are either circles or squares. CIRCLE cues mean that you can EARN that amount if you hit the target. SQUARE cues mean that you can AVOID LOSING that amount if you hit the target. Press any button to continue the instructions.
+If you miss a CIRCLE cue, you will NOT GAIN the amount in the cue. If you miss a SQUARE cue, you will LOSE the amount in the cue. Press any button to continue the instructions.
+Please HOLD STILL while you are in the scanner. 
