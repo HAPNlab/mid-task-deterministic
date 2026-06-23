@@ -1,14 +1,17 @@
 """
 The response window: target onset/offset timing and keypress capture.
 
-run_response is the timing-critical core of a trial. It uses
-psychopy.hardware.keyboard.Keyboard for accurate RT timestamping. FlipTimer
+run_response is the timing-critical core of a trial. It reads frame-accurate
+reaction times through the shared psyexp_core keyboard helpers (get_presses /
+reset_clock_on_flip / clock_time), which expose the PTB keyboard clock. FlipTimer
 (flip_timer.py) accumulates per-flip diagnostics; _ResponseState classifies the
 keypress outcome. No rendering objects are built here; no data is written here.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from psyexp_core.keyboard import clock_time, get_presses, reset_clock_on_flip
 
 from mid_det import config
 from mid_det._psychopy import core, keyboard, visual
@@ -29,10 +32,8 @@ class _ResponseState:
     def poll_pretarget(self, kb: keyboard.Keyboard) -> None:
         """Before target onset any EXP_KEYS press is early. Also drains presses
         queued before the loop (e.g. during wait_for_tr); a plain
-        kb.clearEvents() would silently discard those."""
-        if not self.early_press and kb.getKeys(
-            keyList=config.EXP_KEYS, waitRelease=False
-        ):
+        clear_events() would silently discard those."""
+        if not self.early_press and get_presses(kb, config.EXP_KEYS):
             self.early_press = True
 
     def poll_target(
@@ -42,7 +43,7 @@ class _ResponseState:
         pressed before the onset-flip clock reset → early, never a hit."""
         if self.hit or self.rt_s is not None or self.early_press:
             return
-        keys = kb.getKeys(keyList=config.EXP_KEYS, waitRelease=False)
+        keys = get_presses(kb, config.EXP_KEYS)
         if not keys:
             return
         rt = keys[0].rt
@@ -100,9 +101,9 @@ def run_response(
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:
         t = phase_clock.getTime()
 
-        # Schedule kb.clock reset to fire on the next flip so t=0 aligns with onset.
+        # Schedule kb clock reset to fire on the next flip so t=0 aligns with onset.
         if not target_onset_scheduled and t >= jitter_s:
-            win.callOnFlip(kb.clock.reset)
+            reset_clock_on_flip(kb, win)
             target_onset_scheduled = True
 
         # Decide removal BEFORE the flip: omitting draw_target clears the target
@@ -111,7 +112,7 @@ def run_response(
         # already shown and +1 counts the frame this upcoming flip will complete.
         should_remove = False
         if target_on_screen and target_removed_at is None:
-            frames_shown_after_next_flip = round(kb.clock.getTime() / frame_dur_s) + 1
+            frames_shown_after_next_flip = round(clock_time(kb) / frame_dur_s) + 1
             should_remove = frames_shown_after_next_flip >= n_target_frames
 
         if target_onset_scheduled and target_removed_at is None and not should_remove:

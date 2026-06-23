@@ -13,16 +13,20 @@ from psychopy import core
 
 core.checkPygletDuringWait = False
 
-from psychopy import logging, prefs
-
-prefs.hardware["keyboardBackend"] = "ptb"
-
-from psychopy.hardware import keyboard
+from psychopy import logging
+from psyexp_core import rundir, screen
+from psyexp_core.keyboard import (
+    KEYBOARD_BACKEND,
+    build_keyboard,
+    configure_psychopy_backend,
+    get_keys,
+    wait_for_keys,
+)
 from rich.console import Console
 
 from mid_det import config
 from mid_det.task import display, instructions, trial
-from mid_det.io import bootstrap, recording, scanner, sequences, setup_wizard
+from mid_det.io import recording, scanner, sequences, setup_wizard
 from mid_det.task.calibration import CalibrationState
 from mid_det.task.console import TrialLiveView
 from mid_det.task.debug import DebugOverlay, DebugState
@@ -48,6 +52,10 @@ def _raise_process_priority() -> str | None:
 def run() -> None:
     priority_status = _raise_process_priority()
 
+    # Select the keyboard backend before any Keyboard is built. MID timing
+    # requires the robust PTB backend.
+    configure_psychopy_backend()
+
     import argparse
     parser = argparse.ArgumentParser(prog="mid-task-det")
     parser.add_argument(
@@ -60,7 +68,7 @@ def run() -> None:
     # ── SCREEN & FRAME RATE ──────────────────────────────────────────────────
     # Open the window first so we have a real frame duration to pass into the
     # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
-    win_res, win, screen_diag = bootstrap.setup_screen()
+    win_res, win, screen_diag = screen.setup_screen()
 
     if args.fps is not None:
         frame_rate: float = args.fps
@@ -98,7 +106,8 @@ def run() -> None:
 
     # ── LOGGING ──────────────────────────────────────────────────────────────
     data_dir = Path("data")
-    run_dir = bootstrap.make_run_dir(data_dir, session_info, session_time)
+    run_label = f"{session_info.subject_id}_run{session_info.run_n}"
+    run_dir = rundir.make_run_dir(data_dir, run_label, session_time)
     logging.LogFile(str(run_dir / "experiment.log"), level=logging.EXP)
     logging.console.setLevel(logging.WARNING)
 
@@ -203,18 +212,15 @@ def run() -> None:
     )
 
     # ── KEYBOARD & MOUSE ─────────────────────────────────────────────────────
-    kb = keyboard.Keyboard()
-    actual_backend = kb.device.getBackend()
-    if actual_backend != "ptb":
+    # build_keyboard() returns the PTB Keyboard (muteOutsidePsychopy disabled so
+    # keys register without the window holding OS focus). MID timing requires PTB.
+    if KEYBOARD_BACKEND != "ptb":
         win.close()
         raise RuntimeError(
-            f"Keyboard backend is '{actual_backend}', not 'ptb'. "
+            f"Keyboard backend is '{KEYBOARD_BACKEND}', not 'ptb'. "
             "Install psychtoolbox: pip install psychtoolbox"
         )
-    # PsychoPy ≥2024.1 defaults muteOutsidePsychopy=True on macOS, silently
-    # dropping all keypresses when isRegisteredApp() returns False (common
-    # when launched from a terminal or IDE). Disable it for experiment use.
-    kb.device.muteOutsidePsychopy = False
+    kb = build_keyboard()
     win.mouseVisible = False
 
     # ── INSTRUCTIONS ─────────────────────────────────────────────────────────
@@ -240,7 +246,7 @@ def run() -> None:
         keys_map = config.KEYS_BEHAVIORAL
         rcon.print(f"[bold yellow]Press '{keys_map['start']}' to start the experiment...[/bold yellow]")
         logging.exp(f"Waiting for '{keys_map['start']}' key to start experiment")
-        kb.waitKeys(keyList=[keys_map["start"]], waitRelease=False)
+        wait_for_keys(kb, [keys_map["start"]])
     backend.start()
     rcon.print("[bold green]Scan started[/bold green] — global clock reset")
     logging.exp("Scan started — global clock reset")
@@ -257,7 +263,7 @@ def run() -> None:
     while global_clock.getTime() < t_fix_end:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if kb.getKeys(keyList=["f3"], waitRelease=False):
+        if get_keys(kb, ["f3"]):
             debug_overlay.toggle()
 
     nominal_time = global_clock.getTime()
@@ -340,7 +346,7 @@ def run() -> None:
     while global_clock.getTime() < t_close_start + leadout_s:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if kb.getKeys(keyList=["f3"], waitRelease=False):
+        if get_keys(kb, ["f3"]):
             debug_overlay.toggle()
 
     # ── END SCREEN ───────────────────────────────────────────────────────────
@@ -348,7 +354,7 @@ def run() -> None:
     win.flip()
     rcon.print("[bold yellow]Press '0' to exit the experiment...[/bold yellow]")
     logging.exp("Waiting for '0' key to exit experiment")
-    kb.waitKeys(keyList=["0"], waitRelease=False)
+    wait_for_keys(kb, ["0"])
 
     # ── CLEANUP ──────────────────────────────────────────────────────────────
     behavioral_writer.close()

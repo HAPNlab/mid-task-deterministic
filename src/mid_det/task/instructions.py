@@ -1,16 +1,18 @@
 """
-Instruction presentation: a self-paced, keypress-driven loop that pages through
-text/instructions_MID.txt (one page per non-blank line) and waits for the start
-key. Same draw → flip → poll pattern as the per-phase loops in phases.py, but
-shown once before the trial loop rather than per trial.
+Instruction presentation: pages through text/instructions_MID.txt (one page per
+non-blank line) via the shared psyexp_core instruction pager, then waits for the
+start key. The task owns the pages and how each is drawn; the harness owns the
+flip + key-polling navigation loop.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from psychopy import core, visual
+from psychopy import visual
 from psychopy.hardware import keyboard
+from psyexp_core import instructions as core_instructions
+from psyexp_core.keyboard import get_keys
 from rich.console import Console
 
 from mid_det import config
@@ -50,25 +52,19 @@ def display_instructions(
     if not pages:
         return
 
-    kb.clearEvents()
-    page_idx = 0
-
-    while True:
-        stimuli.instr_prompt.text = pages[page_idx]
+    def _draw_page(page: str, _is_last: bool) -> None:
+        stimuli.instr_prompt.text = page
         stimuli.instr_prompt.draw()
         stimuli.instr_first.draw()
-        win.flip()
 
-        pressed = kb.getKeys(keyList=[forward_key, end_key], waitRelease=False)
-        if not pressed:
-            continue
-        key_name = pressed[0].name
-        if key_name == end_key:
-            core.quit()
-        elif key_name == forward_key:
-            page_idx += 1
-            if page_idx >= len(pages):
-                break
+    core_instructions.page_through(
+        win,
+        pages,
+        _draw_page,
+        forward_keys=[forward_key],
+        quit_keys=[end_key],
+        kb=kb,
+    )
 
     rcon.print(
         f"[bold yellow]End of instructions — press '{start_key}' to continue...[/bold yellow]"
@@ -76,5 +72,5 @@ def display_instructions(
     while True:
         stimuli.instr_finish.draw()
         win.flip()
-        if kb.getKeys(keyList=[start_key], waitRelease=False):
+        if get_keys(kb, [start_key]):
             break

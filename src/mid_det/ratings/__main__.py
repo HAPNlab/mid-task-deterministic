@@ -18,15 +18,19 @@ from psychopy import core
 
 core.checkPygletDuringWait = False
 
-from psychopy import prefs
-
-prefs.hardware["keyboardBackend"] = "ptb"
-
 from psychopy import visual
 from psychopy.hardware import keyboard
+from psyexp_core import rundir, screen
+from psyexp_core.keyboard import (
+    KEYBOARD_BACKEND,
+    build_keyboard,
+    clear_events,
+    configure_psychopy_backend,
+    get_keys,
+)
 from rich.console import Console
 
-from mid_det.io import bootstrap, recording
+from mid_det.io import recording
 from mid_det.ratings import core as rcore
 from mid_det.ratings import display as rdisplay
 from mid_det.ratings.setup_wizard import run_ratings_wizard
@@ -59,11 +63,11 @@ def _load_instruction_pages() -> list[str]:
 def _wait_keys(kb: keyboard.Keyboard, key_list: list[str]):
     """Block until one of *key_list* (or escape) is pressed; return the name.
     Escape quits the survey."""
-    kb.clearEvents()
+    clear_events(kb)
     while True:
-        pressed = kb.getKeys(keyList=key_list + _QUIT_KEYS, waitRelease=False)
+        pressed = get_keys(kb, key_list + _QUIT_KEYS)
         if pressed:
-            name = pressed[0].name
+            name = pressed[0]
             if name in _QUIT_KEYS:
                 core.quit()
             return name
@@ -113,8 +117,11 @@ def _show_fixation(win: visual.Window, stim: rdisplay.RatingStimuli) -> None:
 
 
 def run() -> None:
+    # Select the keyboard backend before any Keyboard is built.
+    configure_psychopy_backend()
+
     # ── SCREEN ───────────────────────────────────────────────────────────────
-    win_res, win, screen_diag = bootstrap.setup_screen()
+    win_res, win, screen_diag = screen.setup_screen()
 
     # ── WIZARD ───────────────────────────────────────────────────────────────
     subject_id, show_instructions, legacy_name = run_ratings_wizard()
@@ -126,9 +133,9 @@ def run() -> None:
     # ── RUN DIR + MANIFEST ───────────────────────────────────────────────────
     # Write the manifest up front (mirroring the MID task) so session metadata is
     # captured even if the survey is aborted before the CSV is written at the end.
-    ts = session_time.strftime("%Y%m%dT%H%M%S")
-    run_dir = _PROJECT_ROOT / "data" / f"{subject_id}_ratings_{ts}"
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = rundir.make_run_dir(
+        _PROJECT_ROOT / "data", f"{subject_id}_ratings", session_time
+    )
     recording.write_ratings_manifest(
         run_dir=run_dir,
         subject_id=subject_id,
@@ -141,15 +148,13 @@ def run() -> None:
     )
 
     # ── KEYBOARD ─────────────────────────────────────────────────────────────
-    kb = keyboard.Keyboard()
-    actual_backend = kb.device.getBackend()
-    if actual_backend != "ptb":
+    if KEYBOARD_BACKEND != "ptb":
         win.close()
         raise RuntimeError(
-            f"Keyboard backend is '{actual_backend}', not 'ptb'. "
+            f"Keyboard backend is '{KEYBOARD_BACKEND}', not 'ptb'. "
             "Install psychtoolbox: pip install psychtoolbox"
         )
-    kb.device.muteOutsidePsychopy = False
+    kb = build_keyboard()
     win.mouseVisible = False
 
     # ── STIMULI ──────────────────────────────────────────────────────────────
