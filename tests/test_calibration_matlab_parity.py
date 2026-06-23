@@ -75,37 +75,45 @@ def _python_windows(
     return out
 
 
-def _octave_windows(
-    cues: list[int], wins: list[int], base_rt: float, rt_change: float
-) -> list[float]:
-    """Per-trial target window from the MATLAB/Octave reference engine."""
+Case = tuple[list[int], list[int], float, float]  # cues, wins, base_rt, rt_change
+_Key = tuple[tuple[int, ...], tuple[int, ...], float, float]
+
+
+def _case_key(cues: list[int], wins: list[int], base_rt: float, rt_change: float) -> _Key:
+    return (tuple(cues), tuple(wins), base_rt, rt_change)
+
+
+def _engine_batch(cases: list[Case]) -> list[list[float]]:
+    """Run every reference computation in a SINGLE engine invocation.
+
+    Launching octave/MATLAB once per parametrized case spawns the app ~17× per
+    run (dock churn, slow startup dominates). Instead, emit one program that runs
+    all cases, delimiting each result block with a ``===`` marker, and split the
+    output back apart. Returns one list of per-trial windows per case, in order.
+    """
     assert _ENGINE is not None
     kind, exe = _ENGINE
-    cues_lit = " ".join(str(c) for c in cues)
-    wins_lit = " ".join(str(w) for w in wins)
-    # %.17g round-trips a double exactly; printf recycles the format per element.
-    code = (
-        f"addpath('{_REF_DIR}');"
-        f"cv = calibration_ref([{cues_lit}], [{wins_lit}], {base_rt!r}, {rt_change!r});"
-        f"printf('%.17g\\n', cv);"
-    )
+    parts = [f"addpath('{_REF_DIR}');"]
+    for cues, wins, base_rt, rt_change in cases:
+        cues_lit = " ".join(str(c) for c in cues)
+        wins_lit = " ".join(str(w) for w in wins)
+        # %.17g round-trips a double exactly; printf recycles the format per element.
+        parts.append(
+            f"cv = calibration_ref([{cues_lit}], [{wins_lit}], {base_rt!r}, {rt_change!r});"
+            f"printf('%.17g\\n', cv); printf('===\\n');"
+        )
+    code = "".join(parts)
     cmd = [exe, "-batch", code] if kind == "matlab" else [exe, "--quiet", "--eval", code]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     if proc.returncode != 0:
         raise RuntimeError(
             f"{kind} reference failed (rc={proc.returncode}):\n{proc.stderr}"
         )
-    return [float(line) for line in proc.stdout.split() if line.strip()]
-
-
-def _assert_parity(
-    cues: list[int], wins: list[int], base_rt: float, rt_change: float
-) -> list[float]:
-    py = _python_windows(cues, wins, base_rt, rt_change)
-    ref = _octave_windows(cues, wins, base_rt, rt_change)
-    assert len(py) == len(cues)
-    assert ref == pytest.approx(py, abs=1e-12)
-    return py
+    results = [
+        [float(tok) for tok in block.split() if tok.strip()]
+        for block in proc.stdout.split("===")
+    ]
+    return [block for block in results if block]  # drop trailing empty split
 
 
 # ── shared test data ──────────────────────────────────────────────────────────
@@ -127,33 +135,79 @@ _ALL_MISS = ([2] * 8, [0] * 8)
 _BOUNDARY = ([4] * 51, [1] * 33 + [0] * 17 + [1])  # ratio hits exactly 33/50 = 0.66
 
 _PARAMS = [(config.BASE_RT_S, config.RT_CHANGE_S), (config.BASE_RT_PRACTICE_S, 1 / 60.0)]
+_SEEDS = [0, 1, 7, 42, 123]
+_EDGE_CASES = [_ALL_WINS, _ALL_MISS, _BOUNDARY]
+_DISCRIMINATING = (_random_sequence(seed=99, n=40), (config.BASE_RT_S, config.RT_CHANGE_S))
+
+
+def _all_cases() -> list[Case]:
+    """Every (cues, wins, base_rt, rt_change) the tests below reference — kept in
+    sync with their parametrize lists so all references resolve from one batch."""
+    cases: list[Case] = []
+    for base_rt, rt_change in _PARAMS:
+        for seed in _SEEDS:
+            cues, wins = _random_sequence(seed, n=120)
+            cases.append((cues, wins, base_rt, rt_change))
+    for base_rt, rt_change in _PARAMS:
+        for cues, wins in _EDGE_CASES:
+            cases.append((list(cues), list(wins), base_rt, rt_change))
+    (dcues, dwins), (dbase, dchange) = _DISCRIMINATING
+    cases.append((dcues, dwins, dbase, dchange))
+    return cases
+
+
+@pytest.fixture(scope="session")
+def engine_refs() -> dict[_Key, list[float]]:
+    """Reference windows for every case, computed in one engine launch per session."""
+    if _ENGINE is None:
+        return {}
+    cases = _all_cases()
+    results = _engine_batch(cases)
+    assert len(results) == len(cases), (
+        f"engine returned {len(results)} result blocks for {len(cases)} cases"
+    )
+    return {_case_key(*case): result for case, result in zip(cases, results)}
+
+
+def _assert_parity(
+    engine_refs: dict[_Key, list[float]],
+    cues: list[int],
+    wins: list[int],
+    base_rt: float,
+    rt_change: float,
+) -> list[float]:
+    py = _python_windows(cues, wins, base_rt, rt_change)
+    ref = engine_refs[_case_key(cues, wins, base_rt, rt_change)]
+    assert len(py) == len(cues)
+    assert ref == pytest.approx(py, abs=1e-12)
+    return py
 
 
 # ── tests ─────────────────────────────────────────────────────────────────────
 
 @requires_engine
 @pytest.mark.parametrize("base_rt,rt_change", _PARAMS)
-@pytest.mark.parametrize("seed", [0, 1, 7, 42, 123])
-def test_parity_random_sequences(base_rt, rt_change, seed):
+@pytest.mark.parametrize("seed", _SEEDS)
+def test_parity_random_sequences(engine_refs, base_rt, rt_change, seed):
     cues, wins = _random_sequence(seed, n=120)
-    windows = _assert_parity(cues, wins, base_rt, rt_change)
+    windows = _assert_parity(engine_refs, cues, wins, base_rt, rt_change)
     # guard against a vacuous pass: adaptation must actually have moved the window
     assert any(w != pytest.approx(base_rt) for w in windows)
 
 
 @requires_engine
 @pytest.mark.parametrize("base_rt,rt_change", _PARAMS)
-@pytest.mark.parametrize("cues,wins", [_ALL_WINS, _ALL_MISS, _BOUNDARY])
-def test_parity_edge_cases(base_rt, rt_change, cues, wins):
-    _assert_parity(list(cues), list(wins), base_rt, rt_change)
+@pytest.mark.parametrize("cues,wins", _EDGE_CASES)
+def test_parity_edge_cases(engine_refs, base_rt, rt_change, cues, wins):
+    _assert_parity(engine_refs, list(cues), list(wins), base_rt, rt_change)
 
 
 @requires_engine
-def test_parity_check_is_discriminating():
+def test_parity_check_is_discriminating(engine_refs):
     """A deliberately wrong Python result must NOT match the reference — proves
     the comparison can actually fail, so a passing parity run is meaningful."""
-    cues, wins = _random_sequence(seed=99, n=40)
-    ref = _octave_windows(cues, wins, config.BASE_RT_S, config.RT_CHANGE_S)
+    (cues, wins), (base_rt, rt_change) = _DISCRIMINATING
+    ref = engine_refs[_case_key(cues, wins, base_rt, rt_change)]
     perturbed = list(ref)
     perturbed[-1] += 0.020  # one trial off by a full rt_change step
     assert perturbed != pytest.approx(ref, abs=1e-12)
