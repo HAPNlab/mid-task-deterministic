@@ -8,7 +8,7 @@ jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Octave is the reference engine for the calibration MATLAB-parity test
       # (tests/test_calibration_matlab_parity.py). Without it that test skips
