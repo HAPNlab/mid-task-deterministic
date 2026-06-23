@@ -48,7 +48,7 @@ jobs:
       # `uv lock --check` fails if the lock is out of date (e.g. the version was
       # bumped in pyproject.toml but uv.lock was never re-locked to match).
       - name: Verify uv.lock is in sync with pyproject.toml
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
       - name: uv lock --check
         run: uv lock --check
 
