@@ -6,7 +6,7 @@ response.py.
 """
 from __future__ import annotations
 
-from psyexp_core.keyboard import clear_events, get_keys
+from psyexp_core.keyboard import clear_events, get_presses
 
 from mid_det import config
 from mid_det._psychopy import core, keyboard, visual
@@ -52,9 +52,9 @@ def run_fixation(
         _poll_hotkeys(kb, overlay)
         # Poll in the loop so a press doesn't sit in the buffer until end-of-phase,
         # where a downstream clear_events() could discard it before inspection.
-        if not early and get_keys(kb, config.EXP_KEYS):
+        if not early and get_presses(kb, config.EXP_KEYS):
             early = True
-    if not early and get_keys(kb, config.EXP_KEYS):
+    if not early and get_presses(kb, config.EXP_KEYS):
         early = True
     return early
 
@@ -93,8 +93,12 @@ def run_iti(
 
 
 def _poll_hotkeys(kb: keyboard.Keyboard, overlay: DebugOverlay | None = None) -> None:
-    """Per-frame operator-hotkey poll: quit on escape, toggle the debug overlay on f3."""
-    if get_keys(kb, ["escape"]):
+    """Per-frame operator-hotkey poll: quit on escape, toggle the debug overlay on f3.
+
+    Uses the device-direct get_presses (not the backend-switching get_keys): the
+    trial hot loop always holds a real PTB Keyboard, and reading it directly keeps
+    this PsychoPy-free so the timing tests can drive it with a fake keyboard."""
+    if get_presses(kb, ["escape"]):
         core.quit()
-    if overlay is not None and get_keys(kb, ["f3"]):
+    if overlay is not None and get_presses(kb, ["f3"]):
         overlay.toggle()

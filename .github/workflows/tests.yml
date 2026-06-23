@@ -29,10 +29,19 @@ jobs:
       # whole test suite imports and runs without it; only pandas is needed at
       # runtime (sequences.py). We install just that + pytest and put `src` on
       # PYTHONPATH rather than resolving the project's full dependency graph.
+      #
+      # psyexp-core is installed --no-deps for the same reason: the light modules
+      # the tests pull in (recording / manifest / rundir / diagnostics / keyboard)
+      # are import-clean without PsychoPy, so --no-deps avoids dragging the GUI
+      # stack back in. Its pinned source is read from uv.lock via `uv export`
+      # rather than hardcoding the git ref here — the lockfile stays the single
+      # source of truth.
       - name: Create venv and install minimal test deps
         run: |
           uv venv
           uv pip install pytest pandas
+          uv export --frozen --no-hashes --no-emit-project | grep '^psyexp-core @' > psyexp-core-req.txt
+          uv pip install --no-deps -r psyexp-core-req.txt
 
       # tests/test_overlay.py is excluded: it's not an automated test (no test
       # functions) but a manual `visual.Window` script that needs a live display
