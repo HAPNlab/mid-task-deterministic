@@ -29,17 +29,26 @@ pager, and the keyboard abstraction — lives in the shared [`psyexp-core`](http
 package. This repo keeps only MID-specific logic (trial loop, reward rule, adaptive staircase,
 sequences, ratings survey, legacy MATLAB CSV) and consumes the harness as a dependency.
 
-`psyexp-core` is pinned by **git tag** in `[project].dependencies` as a PEP 508 direct reference
-(`psyexp-core @ git+https://github.com/HAPNlab/psyexp-core.git@vX.Y.Z`), so both uv and pip/conda
-resolve the same core, and every run's `manifest.json` records the resolved `psyexp_core_version`.
+`psyexp-core` is a **published PyPI package**, declared in `[project].dependencies` as
+`psyexp-core>=X.Y`; the exact version is pinned in `uv.lock` so both uv and pip/conda resolve the
+same core, and every run's `manifest.json` records the resolved `psyexp_core_version`.
 
 To **co-develop** the core against this task, overlay an editable sibling checkout and skip the
-re-sync that would revert it to the pinned tag:
+re-sync that would revert it to the locked version:
 
 ```sh
 uv pip install -e ../psyexp-core
+uv sync --inexact              # if you need to sync, keeps the editable overlay
 uv run --no-sync pytest        # or: export UV_NO_SYNC=1
 ```
 
-Bump the pinned tag in `pyproject.toml` (and re-run `uv lock`) once a new `psyexp-core` release is
-tagged.
+**Updating to a new `psyexp-core` release:** a bare `uv sync` won't move it — it installs exactly
+what `uv.lock` pins. Re-resolve the lock, then apply it:
+
+```sh
+uv lock --upgrade-package psyexp-core   # rewrite uv.lock to the newest version the constraint allows
+uv sync --inexact
+```
+
+Commit the updated `uv.lock` (and bump the `>=` floor in `pyproject.toml` first if you want to
+require a new minimum).

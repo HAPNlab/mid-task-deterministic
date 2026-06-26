@@ -12,13 +12,15 @@ authors = [{ name = "Eric Wang" }]
 dependencies = [
     # Shared experiment harness (screen/frame-timing, run dirs, manifests, CSV
     # writers, setup-wizard primitives, instruction pager, keyboard abstraction).
-    # Pinned by git tag for reproducible clones; the run manifest also records
-    # psyexp_core_version. PEP 508 direct reference so pip/conda resolve it too
-    # (production uses conda — see AGENTS.md). For co-development, overlay an
-    # editable sibling checkout and skip the re-sync that reverts the pin:
+    # Published PyPI package; the exact version is pinned in uv.lock for
+    # reproducible clones and the run manifest also records psyexp_core_version.
+    # pip/conda resolve it too (production uses conda — see AGENTS.md). For
+    # co-development, overlay an editable sibling checkout and skip the re-sync
+    # that reverts it to the locked version:
     #   uv pip install -e ../psyexp-core
+    #   uv sync --inexact           # if you must sync, keeps the editable overlay
     #   uv run --no-sync ...        # or: export UV_NO_SYNC=1
-    "psyexp-core @ git+https://github.com/HAPNlab/psyexp-core.git@v0.5.0",
+    "psyexp-core>=0.7.0",
     "psychopy>=2026.1",
     "scipy>=1.11",
     "numpy>=1.26",

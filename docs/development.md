@@ -61,6 +61,22 @@ pip install -e ".[dev]"
 `uv.lock`) are ignored by pip/conda, so the conda install resolves dependencies fresh from PyPI
 rather than from the lockfile.
 
+## Updating `psyexp-core`
+
+The shared experiment harness lives in the published [`psyexp-core`](https://github.com/HAPNlab/psyexp-core)
+package, declared as `psyexp-core>=X.Y` in `pyproject.toml` with the exact version pinned in
+`uv.lock`. A bare `uv sync` does **not** pull a newer release — it installs exactly what `uv.lock`
+pins, so a newly published version is ignored until the lock is regenerated. To upgrade:
+
+```bash
+uv lock --upgrade-package psyexp-core   # rewrite uv.lock to the newest version the constraint allows
+uv sync --inexact                       # apply it; --inexact keeps any editable-core overlay
+```
+
+Then commit the updated `uv.lock`. Raise the `>=` floor in `pyproject.toml` first if you want to
+require a new minimum. To co-develop the core against this task from a sibling checkout, see
+AGENTS.md ("Shared harness: psyexp-core").
+
 ## Project Structure
 
 ```
