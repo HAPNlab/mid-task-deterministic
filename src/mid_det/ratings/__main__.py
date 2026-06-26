@@ -121,7 +121,10 @@ def run() -> None:
     configure_psychopy_backend()
 
     # ── SCREEN ───────────────────────────────────────────────────────────────
-    win_res, win, screen_diag = screen.setup_screen()
+    # Let the operator pick the display (auto-returns 0 when there's only one);
+    # the chosen monitor is captured in screen_diag and recorded in the manifest.
+    screen_index = screen.prompt_screen()
+    win_res, win, screen_diag = screen.setup_screen(screen=screen_index)
 
     # ── WIZARD ───────────────────────────────────────────────────────────────
     subject_id, show_instructions, legacy_name = run_ratings_wizard()

@@ -66,9 +66,13 @@ def run() -> None:
     args = parser.parse_args()
 
     # ── SCREEN & FRAME RATE ──────────────────────────────────────────────────
-    # Open the window first so we have a real frame duration to pass into the
-    # setup wizard (it uses it for RT-field defaults and frame-alignment hints).
-    win_res, win, screen_diag = screen.setup_screen()
+    # Let the operator pick the display (auto-returns 0 when there's only one),
+    # then open the window first so we have a real frame duration to pass into
+    # the setup wizard (it uses it for RT-field defaults and frame-alignment
+    # hints). The chosen monitor's OS-level detail is captured in screen_diag and
+    # recorded in the run manifest.
+    screen_index = screen.prompt_screen()
+    win_res, win, screen_diag = screen.setup_screen(screen=screen_index)
 
     if args.fps is not None:
         frame_rate: float = args.fps
