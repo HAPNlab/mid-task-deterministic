@@ -128,7 +128,7 @@ def run() -> None:
 
     # ── WIZARD ───────────────────────────────────────────────────────────────
     subject_id, show_instructions, legacy_name = run_ratings_wizard()
-    session_time = datetime.now()
+    session_started_at = datetime.now()
 
     rcon = Console(stderr=True)
     rcon.print(f"[bold]Cue-ratings survey:[/bold] subject=[cyan]{subject_id}[/cyan]")
@@ -137,13 +137,13 @@ def run() -> None:
     # Write the manifest up front (mirroring the MID task) so session metadata is
     # captured even if the survey is aborted before the CSV is written at the end.
     run_dir = rundir.make_run_dir(
-        _PROJECT_ROOT / "data", f"{subject_id}_ratings", session_time
+        _PROJECT_ROOT / "data", f"{subject_id}_ratings", session_started_at
     )
     recording.write_ratings_manifest(
         run_dir=run_dir,
         subject_id=subject_id,
         show_instructions=show_instructions,
-        session_time=session_time,
+        session_started_at=session_started_at,
         screen_diag=screen_diag,
         win_res=win_res,
         n_cues=len(rcore.RATING_CUES),

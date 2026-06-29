@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 def write_manifest(
     run_dir: Path,
     session_info: "SessionInfo",
-    session_time: datetime,
+    session_started_at: datetime,
     frame_rate: float,
     n_trials: int,
     screen_diag: "ScreenDiagnostics",
@@ -63,7 +63,7 @@ def write_manifest(
     _core_write_manifest(
         run_dir,
         header=header,
-        session_time=session_time,
+        session_time=session_started_at,
         screen_diag=screen_diag,
         win_res=win_res,
         study_params=study_params,
@@ -79,7 +79,7 @@ def write_ratings_manifest(
     run_dir: Path,
     subject_id: str,
     show_instructions: bool,
-    session_time: datetime,
+    session_started_at: datetime,
     screen_diag: "ScreenDiagnostics",
     win_res: list[int],
     n_cues: int,
@@ -103,7 +103,7 @@ def write_ratings_manifest(
     _core_write_manifest(
         run_dir,
         header=header,
-        session_time=session_time,
+        session_time=session_started_at,
         screen_diag=screen_diag,
         win_res=win_res,
     )

@@ -106,12 +106,12 @@ def run() -> None:
 
     # ── SETUP WIZARD ─────────────────────────────────────────────────────────
     session_info = setup_wizard.run_wizard(frame_dur_s=frame_dur_s)
-    session_time = datetime.now()
+    session_started_at = datetime.now()
 
     # ── LOGGING ──────────────────────────────────────────────────────────────
     data_dir = Path("data")
     run_label = f"{session_info.subject_id}_run{session_info.run_n}"
-    run_dir = rundir.make_run_dir(data_dir, run_label, session_time)
+    run_dir = rundir.make_run_dir(data_dir, run_label, session_started_at)
     logging.LogFile(str(run_dir / "experiment.log"), level=logging.EXP)
     logging.console.setLevel(logging.WARNING)
 
@@ -205,7 +205,7 @@ def run() -> None:
     recording.write_manifest(
         run_dir=run_dir,
         session_info=session_info,
-        session_time=session_time,
+        session_started_at=session_started_at,
         frame_rate=frame_rate,
         n_trials=n_trials,
         screen_diag=screen_diag,
