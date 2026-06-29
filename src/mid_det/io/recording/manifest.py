@@ -63,7 +63,7 @@ def write_manifest(
     _core_write_manifest(
         run_dir,
         header=header,
-        session_time=session_started_at,
+        session_started_at=session_started_at,
         screen_diag=screen_diag,
         win_res=win_res,
         study_params=study_params,
@@ -103,7 +103,7 @@ def write_ratings_manifest(
     _core_write_manifest(
         run_dir,
         header=header,
-        session_time=session_started_at,
+        session_started_at=session_started_at,
         screen_diag=screen_diag,
         win_res=win_res,
     )

@@ -19,7 +19,7 @@ dependencies = [
     # (any uv sync reverts it — --inexact does NOT help; the core is in the lock):
     #   uv pip install -e ../psyexp-core
     #   uv run --no-sync ...        # or: export UV_NO_SYNC=1  (see `just core-*`)
-    "psyexp-core>=0.7.0",
+    "psyexp-core>=0.8.0",
     "psychopy>=2026.1",
     "scipy>=1.11",
     "numpy>=1.26",
