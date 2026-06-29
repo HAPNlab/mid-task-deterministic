@@ -15,11 +15,10 @@ dependencies = [
     # Published PyPI package; the exact version is pinned in uv.lock for
     # reproducible clones and the run manifest also records psyexp_core_version.
     # pip/conda resolve it too (production uses conda — see AGENTS.md). For
-    # co-development, overlay an editable sibling checkout and skip the re-sync
-    # that reverts it to the locked version:
+    # co-development, overlay an editable sibling checkout and run with --no-sync
+    # (any uv sync reverts it — --inexact does NOT help; the core is in the lock):
     #   uv pip install -e ../psyexp-core
-    #   uv sync --inexact           # if you must sync, keeps the editable overlay
-    #   uv run --no-sync ...        # or: export UV_NO_SYNC=1
+    #   uv run --no-sync ...        # or: export UV_NO_SYNC=1  (see `just core-*`)
     "psyexp-core>=0.7.0",
     "psychopy>=2026.1",
     "scipy>=1.11",

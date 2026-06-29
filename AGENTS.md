@@ -33,21 +33,29 @@ sequences, ratings survey, legacy MATLAB CSV) and consumes the harness as a depe
 `psyexp-core>=X.Y`; the exact version is pinned in `uv.lock` so both uv and pip/conda resolve the
 same core, and every run's `manifest.json` records the resolved `psyexp_core_version`.
 
-To **co-develop** the core against this task, overlay an editable sibling checkout and skip the
-re-sync that would revert it to the locked version:
+To **co-develop** the core against this task, overlay an editable sibling checkout. The catch:
+`uv.lock` is authoritative, so *any* `uv sync` reverts the overlay back to the locked PyPI version —
+`--inexact` does **not** help (it only spares packages absent from the lock, and the core is in it).
+The one thing that preserves the overlay is skipping the sync:
 
 ```sh
 uv pip install -e ../psyexp-core
-uv sync --inexact              # if you need to sync, keeps the editable overlay
-uv run --no-sync pytest        # or: export UV_NO_SYNC=1
+uv run --no-sync pytest        # or: export UV_NO_SYNC=1 for the shell
 ```
 
+The `just` recipes wrap this: `just core-dev` overlays the editable checkout, then `just core-run` /
+`just core-test` run with `--no-sync`; `just core-release` drops it (plain `uv sync`). Don't run a
+bare `uv sync`/`uv run` while overlaying — it silently reverts the editable core. For a setup that
+survives sync, declare the path source in `pyproject.toml`
+(`[tool.uv.sources] psyexp-core = { path = "../psyexp-core", editable = true }`) and keep that edit
+local with `git update-index --skip-worktree pyproject.toml uv.lock` so it never lands in a commit.
+
 **Updating to a new `psyexp-core` release:** a bare `uv sync` won't move it — it installs exactly
-what `uv.lock` pins. Re-resolve the lock, then apply it:
+what `uv.lock` pins. Re-resolve the lock, then apply it (or run `just core-upgrade`):
 
 ```sh
 uv lock --upgrade-package psyexp-core   # rewrite uv.lock to the newest version the constraint allows
-uv sync --inexact
+uv sync
 ```
 
 Commit the updated `uv.lock` (and bump the `>=` floor in `pyproject.toml` first if you want to
