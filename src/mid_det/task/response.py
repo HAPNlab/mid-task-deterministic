@@ -30,10 +30,10 @@ class _ResponseState:
     rt_s: float | None = None
 
     def poll_pretarget(self, kb: keyboard.Keyboard) -> None:
-        """Before target onset any EXP_KEYS press is early. Also drains presses
+        """Before target onset any RESPONSE_KEYS press is early. Also drains presses
         queued before the loop (e.g. during wait_for_tr); a plain
         clear_events() would silently discard those."""
-        if not self.early_press and get_presses(kb, config.EXP_KEYS):
+        if not self.early_press and get_presses(kb, config.RESPONSE_KEYS):
             self.early_press = True
 
     def poll_target(
@@ -43,7 +43,7 @@ class _ResponseState:
         pressed before the onset-flip clock reset → early, never a hit."""
         if self.hit or self.rt_s is not None or self.early_press:
             return
-        keys = get_presses(kb, config.EXP_KEYS)
+        keys = get_presses(kb, config.RESPONSE_KEYS)
         if not keys:
             return
         rt = keys[0].rt
@@ -94,8 +94,8 @@ def run_response(
     response = _ResponseState(early_press=early_press)
 
     # Drain any presses queued between fixation end and now (e.g. during
-    # pulse_counter.wait_for_tr() or scheduler hiccups). Any EXP_KEYS press here
-    # belongs to the pre-target window and must count as early.
+    # pulse_counter.wait_for_tr() or scheduler hiccups). Any RESPONSE_KEYS press
+    # here belongs to the pre-target window and must count as early.
     response.poll_pretarget(kb)
 
     while phase_clock.getTime() < config.STUDY_TIMES_S["response"]:

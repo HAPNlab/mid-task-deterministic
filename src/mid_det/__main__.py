@@ -148,7 +148,6 @@ def run() -> None:
 
     # ── BUILD STIMULI ────────────────────────────────────────────────────────
     stimuli_obj = display.build_stimuli(win)
-    display.update_instr_keys(stimuli_obj, session_info.fmri)
 
     # ── DEBUG OVERLAY (F3 to toggle) ─────────────────────────────────────────
     debug_state = DebugState(
@@ -229,7 +228,7 @@ def run() -> None:
 
     # ── INSTRUCTIONS ─────────────────────────────────────────────────────────
     if session_info.show_instructions:
-        instructions.display_instructions(win, stimuli_obj, session_info, kb, rcon)
+        instructions.display_instructions(win, stimuli_obj, kb, rcon)
 
     # ── PULSE COUNTER ────────────────────────────────────────────────────────
     backend = scanner.make_backend(session_info.fmri)
@@ -247,10 +246,10 @@ def run() -> None:
         logging.exp("Waiting for first TR pulse")
         pulse_counter.wait_for_start()
     else:
-        keys_map = config.KEYS_BEHAVIORAL
-        rcon.print(f"[bold yellow]Press '{keys_map['start']}' to start the experiment...[/bold yellow]")
-        logging.exp(f"Waiting for '{keys_map['start']}' key to start experiment")
-        wait_for_keys(kb, [keys_map["start"]])
+        start_key = config.START_KEYS[0]
+        rcon.print(f"[bold yellow]Press '{start_key}' to start the experiment...[/bold yellow]")
+        logging.exp(f"Waiting for '{start_key}' key to start experiment")
+        wait_for_keys(kb, config.START_KEYS)
     backend.start()
     rcon.print("[bold green]Scan started[/bold green] — global clock reset")
     logging.exp("Scan started — global clock reset")
@@ -267,7 +266,7 @@ def run() -> None:
     while global_clock.getTime() < t_fix_end:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if get_keys(kb, ["f3"]):
+        if get_keys(kb, config.OVERLAY_TOGGLE_KEYS):
             debug_overlay.toggle()
 
     nominal_time = global_clock.getTime()
@@ -350,15 +349,16 @@ def run() -> None:
     while global_clock.getTime() < t_close_start + leadout_s:
         stimuli_obj.fix_o.draw()
         win.flip()
-        if get_keys(kb, ["f3"]):
+        if get_keys(kb, config.OVERLAY_TOGGLE_KEYS):
             debug_overlay.toggle()
 
     # ── END SCREEN ───────────────────────────────────────────────────────────
     stimuli_obj.end.draw()
     win.flip()
-    rcon.print("[bold yellow]Press '0' to exit the experiment...[/bold yellow]")
-    logging.exp("Waiting for '0' key to exit experiment")
-    wait_for_keys(kb, ["0"])
+    end_key = config.END_KEYS[0]
+    rcon.print(f"[bold yellow]Press '{end_key}' to exit the experiment...[/bold yellow]")
+    logging.exp(f"Waiting for '{end_key}' key to exit experiment")
+    wait_for_keys(kb, config.END_KEYS)
 
     # ── CLEANUP ──────────────────────────────────────────────────────────────
     behavioral_writer.close()

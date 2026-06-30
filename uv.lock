@@ -589,7 +589,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0" },
     { name = "prompt-toolkit", specifier = ">=3.0" },
     { name = "psychopy", specifier = ">=2026.1" },
-    { name = "psyexp-core", specifier = ">=0.7.0" },
+    { name = "psyexp-core", specifier = ">=0.8.0" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'", specifier = ">=10" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "questionary", specifier = ">=2.0" },
@@ -930,7 +930,7 @@ wheels = [
 
 [[package]]
 name = "psyexp-core"
-version = "0.7.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -944,9 +944,9 @@ dependencies = [
     { name = "questionary" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3f/52/0bed01d3b94eaeaafce49567b6d639e6db63524f00420a6d87324e84ee57/psyexp_core-0.7.0.tar.gz", hash = "sha256:691ceef19c6f2a78faac0c2de25813ca011f8cea1c03fbcee1b5b440fc996a91", size = 136293, upload-time = "2026-06-25T21:33:05.697Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8b/26/8880f7e0275ad5462c521f30d7d478e32f5d6896133554646014f27b006d/psyexp_core-0.8.0.tar.gz", hash = "sha256:bf6a27a3d632c2eca564e257435ed0a173bf6c8a5c204225b3d59fd0d030b0eb", size = 136762, upload-time = "2026-06-29T18:35:02.511Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e0/12/fd0e4e734e0f981c55ef1a75114a94a1222a229d4599f4a1d8cf246221cb/psyexp_core-0.7.0-py3-none-any.whl", hash = "sha256:569614eae8a487649eb9c09f6c09272687301aed66f4983a890a2ff7bbd539db", size = 24368, upload-time = "2026-06-25T21:33:04.13Z" },
+    { url = "https://files.pythonhosted.org/packages/57/32/6d68358389da5985aaaea2a59b37ca8ed4440a7faf1de7819f3c1888b3a1/psyexp_core-0.8.0-py3-none-any.whl", hash = "sha256:335fb6094486433dd399ec854e7e81ec93b2436498bfe58a0a3f5a539b0376b5", size = 24544, upload-time = "2026-06-29T18:35:01.1Z" },
 ]
 
 [[package]]
@@ -1625,7 +1625,7 @@ name = "pyobjc-framework-cocoa"
 version = "12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
+    { name = "pyobjc-core", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/02/a3/16ca9a15e77c061a9250afbae2eae26f2e1579eb8ca9462ae2d2c71e1169/pyobjc_framework_cocoa-12.1.tar.gz", hash = "sha256:5556c87db95711b985d5efdaaf01c917ddd41d148b1e52a0c66b1a2e2c5c1640", size = 2772191, upload-time = "2025-11-14T10:13:02.069Z" }
 wheels = [
@@ -2880,8 +2880,8 @@ name = "pyobjc-framework-quartz"
 version = "12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-core", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/94/18/cc59f3d4355c9456fc945eae7fe8797003c4da99212dd531ad1b0de8a0c6/pyobjc_framework_quartz-12.1.tar.gz", hash = "sha256:27f782f3513ac88ec9b6c82d9767eef95a5cf4175ce88a1e5a65875fee799608", size = 3159099, upload-time = "2025-11-14T10:21:24.31Z" }
 wheels = [

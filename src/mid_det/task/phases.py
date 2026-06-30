@@ -52,9 +52,9 @@ def run_fixation(
         _poll_hotkeys(kb, overlay)
         # Poll in the loop so a press doesn't sit in the buffer until end-of-phase,
         # where a downstream clear_events() could discard it before inspection.
-        if not early and get_presses(kb, config.EXP_KEYS):
+        if not early and get_presses(kb, config.RESPONSE_KEYS):
             early = True
-    if not early and get_presses(kb, config.EXP_KEYS):
+    if not early and get_presses(kb, config.RESPONSE_KEYS):
         early = True
     return early
 
@@ -98,7 +98,7 @@ def _poll_hotkeys(kb: keyboard.Keyboard, overlay: DebugOverlay | None = None) ->
     Uses the device-direct get_presses (not the backend-switching get_keys): the
     trial hot loop always holds a real PTB Keyboard, and reading it directly keeps
     this PsychoPy-free so the timing tests can drive it with a fake keyboard."""
-    if get_presses(kb, ["escape"]):
+    if get_presses(kb, config.QUIT_KEYS):
         core.quit()
-    if overlay is not None and get_presses(kb, ["f3"]):
+    if overlay is not None and get_presses(kb, config.OVERLAY_TOGGLE_KEYS):
         overlay.toggle()

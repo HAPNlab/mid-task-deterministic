@@ -24,12 +24,12 @@ from psyexp_core import rundir, screen
 from psyexp_core.keyboard import (
     KEYBOARD_BACKEND,
     build_keyboard,
-    clear_events,
     configure_psychopy_backend,
-    get_keys,
+    wait_for_key,
 )
 from rich.console import Console
 
+from mid_det import config
 from mid_det.io import recording
 from mid_det.ratings import core as rcore
 from mid_det.ratings import display as rdisplay
@@ -46,7 +46,6 @@ _KEY_SELECT = "3"
 _ADVANCE_KEYS = [_KEY_LEFT, _KEY_RIGHT, _KEY_SELECT]
 # Instruction/text pages advance on button 1 only (forward-only, no going back).
 _PAGE_ADVANCE_KEYS = [_KEY_LEFT]
-_QUIT_KEYS = ["escape"]
 
 
 def _load_instruction_pages() -> list[str]:
@@ -60,22 +59,9 @@ def _load_instruction_pages() -> list[str]:
     return pages
 
 
-def _wait_keys(kb: keyboard.Keyboard, key_list: list[str]):
-    """Block until one of *key_list* (or escape) is pressed; return the name.
-    Escape quits the survey."""
-    clear_events(kb)
-    while True:
-        pressed = get_keys(kb, key_list + _QUIT_KEYS)
-        if pressed:
-            name = pressed[0]
-            if name in _QUIT_KEYS:
-                core.quit()
-            return name
-
-
 def _show_text_page(
     win: visual.Window,
-    kb: keyboard.Keyboard,
+    kb: keyboard.Keyboard | None,
     text_stim: visual.TextStim,
     hint_stim: visual.TextStim,
     text: str,
@@ -84,12 +70,12 @@ def _show_text_page(
     text_stim.draw()
     hint_stim.draw()
     win.flip()
-    _wait_keys(kb, _PAGE_ADVANCE_KEYS)
+    wait_for_key(kb, _PAGE_ADVANCE_KEYS, quit_keys=config.QUIT_KEYS)
 
 
 def _run_slider(
     win: visual.Window,
-    kb: keyboard.Keyboard,
+    kb: keyboard.Keyboard | None,
     stim: rdisplay.RatingStimuli,
     scale: str,
     cue: rcore.RatingCue | None,
@@ -99,7 +85,7 @@ def _run_slider(
     rdisplay.draw_scale(stim, scale, pos, cue)
     win.flip()
     while True:
-        key = _wait_keys(kb, _ADVANCE_KEYS)
+        key = wait_for_key(kb, _ADVANCE_KEYS, quit_keys=config.QUIT_KEYS)
         if key == _KEY_LEFT:
             pos = rcore.clamp_slider(pos, -1)
         elif key == _KEY_RIGHT:
@@ -226,7 +212,11 @@ def run() -> None:
     )
     end.draw()
     win.flip()
-    core.wait(1.5)
+
+    rcon.print("[bold green]Run complete[/bold green]")
+    exit_key = config.END_KEYS[0]
+    rcon.print(f"[bold yellow]Press '{exit_key}' to exit...[/bold yellow]")
+    wait_for_key(kb, config.END_KEYS, quit_keys=config.QUIT_KEYS)
 
     win.close()
     core.quit()
