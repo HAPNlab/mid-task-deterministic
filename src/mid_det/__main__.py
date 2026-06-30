@@ -5,6 +5,7 @@ Wires all modules together.
 from __future__ import annotations
 
 import platform
+from contextlib import ExitStack
 from datetime import datetime
 from pathlib import Path
 
@@ -186,187 +187,192 @@ def run() -> None:
         f"win-ratio threshold={config.WIN_RATIO_THRESHOLD}"
     )
 
-    # ── SETUP OUTPUT FILES ───────────────────────────────────────────────────
+    # ── SETUP OUTPUT FILES + GUARANTEED TEARDOWN ─────────────────────────────
+    # Register teardown on an ExitStack as each resource is acquired, so the
+    # writers, logging, and the window are always closed — on normal completion,
+    # a quit key (core.quit -> SystemExit from _poll_hotkeys), or a mid-run error
+    # — not just the happy path. core.quit() is called after the block (not
+    # registered) so a genuine error still propagates with its traceback.
     file_stem = f"{session_info.subject_id}_run{session_info.run_n}"
-    behavioral_writer = recording.BehavioralCsvWriter(run_dir / f"behavioral_{file_stem}.csv")
-    target_timing_writer = recording.TargetTimingCsvWriter(run_dir / f"target_timing_{file_stem}.csv")
-    scan_log_writer = recording.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
-    legacy_dir = data_dir / "legacy-fmt"
-    legacy_dir.mkdir(parents=True, exist_ok=True)
-    # MATLAB PartialParseData.m numbers trials continuously across blocks: block 1
-    # is trials 1-42, so block 2 continues from 43. Our trial_n restarts at 1 each
-    # run, so shift run 2 up by block 1's length (42) to restore that numbering.
-    legacy_trial_offset = 42 if session_info.run_n == "2" else 0
-    legacy_writer = recording.LegacyMidCsvWriter(
-        legacy_dir / f"{session_info.legacy_name}_b{session_info.run_n}.csv",
-        trial_offset=legacy_trial_offset,
-    )
-    recording.write_manifest(
-        run_dir=run_dir,
-        session_info=session_info,
-        session_started_at=session_started_at,
-        frame_rate=frame_rate,
-        n_trials=n_trials,
-        screen_diag=screen_diag,
-        frame_dur_s=frame_dur_s,
-        frame_dur_source=fps_source,
-        win_res=win_res,
-        priority_raised=(priority_status == "HIGH_PRIORITY_CLASS"),
-    )
+    with ExitStack() as stack:
+        stack.callback(win.close)
+        stack.callback(logging.flush)
 
-    # ── KEYBOARD & MOUSE ─────────────────────────────────────────────────────
-    # build_keyboard() returns the PTB Keyboard (muteOutsidePsychopy disabled so
-    # keys register without the window holding OS focus). MID timing requires PTB.
-    if KEYBOARD_BACKEND != "ptb":
-        win.close()
-        raise RuntimeError(
-            f"Keyboard backend is '{KEYBOARD_BACKEND}', not 'ptb'. "
-            "Install psychtoolbox: pip install psychtoolbox"
+        behavioral_writer = recording.BehavioralCsvWriter(run_dir / f"behavioral_{file_stem}.csv")
+        stack.callback(behavioral_writer.close)
+        target_timing_writer = recording.TargetTimingCsvWriter(run_dir / f"target_timing_{file_stem}.csv")
+        stack.callback(target_timing_writer.close)
+        scan_log_writer = recording.ScanLogWriter(run_dir / f"scan_log_{file_stem}.csv")
+        stack.callback(scan_log_writer.close)
+        legacy_dir = data_dir / "legacy-fmt"
+        legacy_dir.mkdir(parents=True, exist_ok=True)
+        # MATLAB PartialParseData.m numbers trials continuously across blocks: block 1
+        # is trials 1-42, so block 2 continues from 43. Our trial_n restarts at 1 each
+        # run, so shift run 2 up by block 1's length (42) to restore that numbering.
+        legacy_trial_offset = 42 if session_info.run_n == "2" else 0
+        legacy_writer = recording.LegacyMidCsvWriter(
+            legacy_dir / f"{session_info.legacy_name}_b{session_info.run_n}.csv",
+            trial_offset=legacy_trial_offset,
         )
-    kb = build_keyboard()
-    win.mouseVisible = False
+        stack.callback(legacy_writer.close)
+        recording.write_manifest(
+            run_dir=run_dir,
+            session_info=session_info,
+            session_started_at=session_started_at,
+            frame_rate=frame_rate,
+            n_trials=n_trials,
+            screen_diag=screen_diag,
+            frame_dur_s=frame_dur_s,
+            frame_dur_source=fps_source,
+            win_res=win_res,
+            priority_raised=(priority_status == "HIGH_PRIORITY_CLASS"),
+        )
 
-    # ── INSTRUCTIONS ─────────────────────────────────────────────────────────
-    if session_info.show_instructions:
-        instructions.display_instructions(win, stimuli_obj, kb, rcon)
-
-    # ── PULSE COUNTER ────────────────────────────────────────────────────────
-    backend = scanner.make_backend(session_info.fmri)
-    backend_name = "hardware (MCC DAQ)" if isinstance(backend, scanner.HardwareBackend) else "emulated"
-    rcon.print(f"[bold]Scanner backend:[/bold] {backend_name}")
-    logging.exp(f"Scanner backend: {backend_name}")
-    pulse_counter = scanner.PulseCounter(backend)
-
-    # ── WAIT FOR SCAN START ──────────────────────────────────────────────────
-    stimuli_obj.wait.draw()
-    win.flip()
-
-    if session_info.fmri:
-        rcon.print("[bold yellow]Waiting for first TR pulse...[/bold yellow]")
-        logging.exp("Waiting for first TR pulse")
-        pulse_counter.wait_for_start()
-    else:
-        start_key = config.START_KEYS[0]
-        rcon.print(f"[bold yellow]Press '{start_key}' to start the experiment...[/bold yellow]")
-        logging.exp(f"Waiting for '{start_key}' key to start experiment")
-        wait_for_keys(kb, config.START_KEYS)
-    backend.start()
-    rcon.print("[bold green]Scan started[/bold green] — global clock reset")
-    logging.exp("Scan started — global clock reset")
-
-    # ── GLOBAL CLOCK & INITIAL FIXATION ──────────────────────────────────────
-    global_clock = core.Clock()
-    global_clock.reset()
-
-    is_practice = session_info.run_n == "practice"
-    leadin_s = config.PRACTICE_INITIAL_FIX_DUR_S if is_practice else config.INITIAL_FIX_DUR_S
-    leadout_s = config.PRACTICE_CLOSING_FIX_DUR_S if is_practice else config.CLOSING_FIX_DUR_S
-
-    t_fix_end = leadin_s
-    while global_clock.getTime() < t_fix_end:
-        stimuli_obj.fix_o.draw()
-        win.flip()
-        if get_keys(kb, config.OVERLAY_TOGGLE_KEYS):
-            debug_overlay.toggle()
-
-    nominal_time = global_clock.getTime()
-
-    # ── TRIAL LOOP ───────────────────────────────────────────────────────────
-    pulse_ct = 0
-    total_earned = 0
-    n_hits = 0
-    n_trials_done = 0
-
-    with TrialLiveView(rcon, n_trials) as view:
-        for trial_idx, row in sequence.iterrows():
-            trial_n = int(trial_idx) + 1
-            n_iti = int(row["n_iti"])
-            cue_lbl = config.cue_label(str(row["polarity"]), int(row["magnitude"]))
-
-            view.start_trial(trial_n, cue_lbl, n_hits, n_trials_done)
-
-            debug_overlay.state.trial_n = trial_n
-            debug_overlay.state.n_hits = n_hits
-            debug_overlay.state.n_trials_done = n_trials_done
-            debug_overlay.state.total_earned = total_earned
-
-            rec, target_timing, scan_phases, nominal_time, total_earned = trial.run_trial(
-                win=win,
-                stimuli=stimuli_obj,
-                kb=kb,
-                global_clock=global_clock,
-                row=row,
-                trial_n=trial_n,
-                n_trials=n_trials,
-                n_iti_trs=n_iti,
-                nominal_time=nominal_time,
-                total_earned=total_earned,
-                subject_id=session_info.subject_id,
-                run_n=session_info.run_n,
-                pulse_ct=pulse_ct,
-                pulse_counter=pulse_counter,
-                calibration=calibration,
-                frame_dur_s=frame_dur_s,
-                on_window=view.on_window,
-                on_response=view.on_response,
-                overlay=debug_overlay,
+        # ── KEYBOARD & MOUSE ─────────────────────────────────────────────────
+        # build_keyboard() returns the PTB Keyboard (muteOutsidePsychopy disabled
+        # so keys register without the window holding OS focus). MID requires PTB.
+        if KEYBOARD_BACKEND != "ptb":
+            raise RuntimeError(
+                f"Keyboard backend is '{KEYBOARD_BACKEND}', not 'ptb'. "
+                "Install psychtoolbox: pip install psychtoolbox"
             )
+        kb = build_keyboard()
+        win.mouseVisible = False
 
-            if scan_phases:
-                pulse_ct = scan_phases[-1].pulse_ct
+        # ── INSTRUCTIONS ─────────────────────────────────────────────────────
+        if session_info.show_instructions:
+            instructions.display_instructions(win, stimuli_obj, kb, rcon)
 
-            n_trials_done += 1
-            n_hits += rec.hit
-            hit_rate = n_hits / n_trials_done * 100
-            rt_str = f"{rec.rt_ms:.0f} ms" if rec.rt_ms != "" else "—"
-            win_str = f"{rec.target_dur_ms_actual:.2f} ms" if rec.target_dur_ms_actual != "" else "—"
-            result_label = "HIT" if rec.hit else ("early" if rec.early_press else "miss")
+        # ── PULSE COUNTER ────────────────────────────────────────────────────
+        backend = scanner.make_backend(session_info.fmri)
+        backend_name = "hardware (MCC DAQ)" if isinstance(backend, scanner.HardwareBackend) else "emulated"
+        rcon.print(f"[bold]Scanner backend:[/bold] {backend_name}")
+        logging.exp(f"Scanner backend: {backend_name}")
+        pulse_counter = scanner.PulseCounter(backend)
 
-            logging.exp(
-                f"  -> {result_label:<5}  RT={rt_str:>6}  win={win_str}  "
-                f"outcome={rec.reward_outcome:>4}  total={f'${rec.total_earned}':>5}  "
-                f"hit_rate={hit_rate:3.0f}%"
-            )
-
-            behavioral_writer.append(rec)
-            target_timing_writer.append(target_timing)
-            legacy_writer.append(rec)
-            for sp in scan_phases:
-                scan_log_writer.append(sp)
-
-    rcon.print(
-        f"\n[bold]Run complete:[/bold] {n_hits}/{n_trials_done} hits "
-        f"([cyan]{n_hits / n_trials_done * 100:.0f}%[/cyan])  "
-        f"total earned: [bold cyan]${total_earned}[/bold cyan]"
-    )
-    logging.exp(
-        f"Run complete: {n_hits}/{n_trials_done} hits "
-        f"({n_hits / n_trials_done * 100:.0f}%)  total earned: ${total_earned}"
-    )
-
-    # ── CLOSING FIXATION ─────────────────────────────────────────────────────
-    t_close_start = global_clock.getTime()
-    while global_clock.getTime() < t_close_start + leadout_s:
-        stimuli_obj.fix_o.draw()
+        # ── WAIT FOR SCAN START ──────────────────────────────────────────────
+        stimuli_obj.wait.draw()
         win.flip()
-        if get_keys(kb, config.OVERLAY_TOGGLE_KEYS):
-            debug_overlay.toggle()
 
-    # ── END SCREEN ───────────────────────────────────────────────────────────
-    stimuli_obj.end.draw()
-    win.flip()
-    end_key = config.END_KEYS[0]
-    rcon.print(f"[bold yellow]Press '{end_key}' to exit the experiment...[/bold yellow]")
-    logging.exp(f"Waiting for '{end_key}' key to exit experiment")
-    wait_for_keys(kb, config.END_KEYS)
+        if session_info.fmri:
+            rcon.print("[bold yellow]Waiting for first TR pulse...[/bold yellow]")
+            logging.exp("Waiting for first TR pulse")
+            pulse_counter.wait_for_start()
+        else:
+            start_key = config.START_KEYS[0]
+            rcon.print(f"[bold yellow]Press '{start_key}' to start the experiment...[/bold yellow]")
+            logging.exp(f"Waiting for '{start_key}' key to start experiment")
+            wait_for_keys(kb, config.START_KEYS)
+        backend.start()
+        rcon.print("[bold green]Scan started[/bold green] — global clock reset")
+        logging.exp("Scan started — global clock reset")
 
-    # ── CLEANUP ──────────────────────────────────────────────────────────────
-    behavioral_writer.close()
-    target_timing_writer.close()
-    scan_log_writer.close()
-    legacy_writer.close()
-    logging.flush()
-    win.close()
+        # ── GLOBAL CLOCK & INITIAL FIXATION ──────────────────────────────────
+        global_clock = core.Clock()
+        global_clock.reset()
+
+        is_practice = session_info.run_n == "practice"
+        leadin_s = config.PRACTICE_INITIAL_FIX_DUR_S if is_practice else config.INITIAL_FIX_DUR_S
+        leadout_s = config.PRACTICE_CLOSING_FIX_DUR_S if is_practice else config.CLOSING_FIX_DUR_S
+
+        t_fix_end = leadin_s
+        while global_clock.getTime() < t_fix_end:
+            stimuli_obj.fix_o.draw()
+            win.flip()
+            if get_keys(kb, config.OVERLAY_TOGGLE_KEYS):
+                debug_overlay.toggle()
+
+        nominal_time = global_clock.getTime()
+
+        # ── TRIAL LOOP ───────────────────────────────────────────────────────
+        pulse_ct = 0
+        total_earned = 0
+        n_hits = 0
+        n_trials_done = 0
+
+        with TrialLiveView(rcon, n_trials) as view:
+            for trial_idx, row in sequence.iterrows():
+                trial_n = int(trial_idx) + 1
+                n_iti = int(row["n_iti"])
+                cue_lbl = config.cue_label(str(row["polarity"]), int(row["magnitude"]))
+
+                view.start_trial(trial_n, cue_lbl, n_hits, n_trials_done)
+
+                debug_overlay.state.trial_n = trial_n
+                debug_overlay.state.n_hits = n_hits
+                debug_overlay.state.n_trials_done = n_trials_done
+                debug_overlay.state.total_earned = total_earned
+
+                rec, target_timing, scan_phases, nominal_time, total_earned = trial.run_trial(
+                    win=win,
+                    stimuli=stimuli_obj,
+                    kb=kb,
+                    global_clock=global_clock,
+                    row=row,
+                    trial_n=trial_n,
+                    n_trials=n_trials,
+                    n_iti_trs=n_iti,
+                    nominal_time=nominal_time,
+                    total_earned=total_earned,
+                    subject_id=session_info.subject_id,
+                    run_n=session_info.run_n,
+                    pulse_ct=pulse_ct,
+                    pulse_counter=pulse_counter,
+                    calibration=calibration,
+                    frame_dur_s=frame_dur_s,
+                    on_window=view.on_window,
+                    on_response=view.on_response,
+                    overlay=debug_overlay,
+                )
+
+                if scan_phases:
+                    pulse_ct = scan_phases[-1].pulse_ct
+
+                n_trials_done += 1
+                n_hits += rec.hit
+                hit_rate = n_hits / n_trials_done * 100
+                rt_str = f"{rec.rt_ms:.0f} ms" if rec.rt_ms != "" else "—"
+                win_str = f"{rec.target_dur_ms_actual:.2f} ms" if rec.target_dur_ms_actual != "" else "—"
+                result_label = "HIT" if rec.hit else ("early" if rec.early_press else "miss")
+
+                logging.exp(
+                    f"  -> {result_label:<5}  RT={rt_str:>6}  win={win_str}  "
+                    f"outcome={rec.reward_outcome:>4}  total={f'${rec.total_earned}':>5}  "
+                    f"hit_rate={hit_rate:3.0f}%"
+                )
+
+                behavioral_writer.append(rec)
+                target_timing_writer.append(target_timing)
+                legacy_writer.append(rec)
+                for sp in scan_phases:
+                    scan_log_writer.append(sp)
+
+        rcon.print(
+            f"\n[bold]Run complete:[/bold] {n_hits}/{n_trials_done} hits "
+            f"([cyan]{n_hits / n_trials_done * 100:.0f}%[/cyan])  "
+            f"total earned: [bold cyan]${total_earned}[/bold cyan]"
+        )
+        logging.exp(
+            f"Run complete: {n_hits}/{n_trials_done} hits "
+            f"({n_hits / n_trials_done * 100:.0f}%)  total earned: ${total_earned}"
+        )
+
+        # ── CLOSING FIXATION ─────────────────────────────────────────────────
+        t_close_start = global_clock.getTime()
+        while global_clock.getTime() < t_close_start + leadout_s:
+            stimuli_obj.fix_o.draw()
+            win.flip()
+            if get_keys(kb, config.OVERLAY_TOGGLE_KEYS):
+                debug_overlay.toggle()
+
+        # ── END SCREEN ───────────────────────────────────────────────────────
+        stimuli_obj.end.draw()
+        win.flip()
+        end_key = config.END_KEYS[0]
+        rcon.print(f"[bold yellow]Press '{end_key}' to exit the experiment...[/bold yellow]")
+        logging.exp(f"Waiting for '{end_key}' key to exit experiment")
+        wait_for_keys(kb, config.END_KEYS)
+
     core.quit()
 
 
