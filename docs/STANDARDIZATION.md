@@ -231,9 +231,13 @@ anything else, and mid opts into the same guarantee for one `stack.callback`. It
 per-task `run()` made of §1–§5 helpers. (Friendly `on_teardown` / `on_abort`
 aliases are trivial sugar over `callback` / `push` if the raw names read poorly.)
 
-**Recommendation:** do (a) for every task; add (b) to core only once a second
-hardware task needs the teardown guarantee heat already has. Skip the
-phase-sequencing orchestrator entirely.
+**Status:** both tasks now wrap their `run()` teardown in a **local** `ExitStack`
+(heat dropped its `try/finally` + `halted_cleanly` flag and derives MMS stop-vs-
+abort from `exc_type`; mid gained the guaranteed teardown it previously lacked).
+Each calls `core.quit()` *after* the block so a genuine error still surfaces its
+traceback. Promoting this to a **shared** `psyexp_core.experiment_session` helper
+(the sketch above) stays deferred until a third — or second hardware — task makes
+the dedup worthwhile. The phase-sequencing orchestrator stays rejected.
 
 ---
 
@@ -248,10 +252,11 @@ phase-sequencing orchestrator entirely.
    helpers from core; drop the duplicated placeholder/idioms.
 4. **heat-task**: bump to `>=0.8.0` first to fix the manifest kwarg (§5), then to
    `0.9.0`; replace its `phases.py` helpers with the core ones.
-5. **psyexp-core `0.10.0`** (optional): `LiveTableView` (§4), and — only if a
-   second hardware task needs the same guarantee heat has — the teardown-only
-   `experiment_session` (§6b). The phase-sequencing runner is explicitly **not**
-   planned; `run()` stays per-task (§6a).
+5. **psyexp-core `0.10.0`** (optional): `LiveTableView` (§4). Both tasks already
+   use a *local* `ExitStack` for teardown (§6b); consolidating that into a shared
+   `experiment_session` helper is deferred until a second hardware task needs it.
+   The phase-sequencing runner is explicitly **not** planned; `run()` stays
+   per-task (§6a).
 
 Sequencing keeps each step small and independently shippable, and never leaves a
 task repo importing a core symbol that isn't released yet.
