@@ -1,8 +1,9 @@
 """
-Screen-flow helpers for the cue-ratings survey: text pages, the slider
-interaction loop, and the inter-trial fixation. These own the draw + key-poll
-loops (I/O + response logic), keeping mid_det.ratings.display a pure draw layer
-and mid_det.ratings.__main__ a thin orchestrator.
+Interactive screens for the cue-ratings survey: text pages, the slider
+interaction loop, and the inter-trial fixation. Each shows one screen and waits
+for input, owning the draw + key-poll loops (I/O + response logic) so that
+mid_det.ratings.display stays a pure draw layer and mid_det.ratings.__main__ a
+thin orchestrator.
 
 Ported from MATLAB RunRatings.m.
 """

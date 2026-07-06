@@ -32,7 +32,7 @@ from mid_det import config
 from mid_det.io import recording
 from mid_det.ratings import core as rcore
 from mid_det.ratings import display as rdisplay
-from mid_det.ratings import flow
+from mid_det.ratings import screens
 from mid_det.ratings.setup_wizard import run_ratings_wizard
 
 _PACKAGE_DIR = Path(__file__).resolve().parent          # src/mid_det/ratings/
@@ -97,32 +97,32 @@ def run() -> None:
         pos=(0, -0.38), height=1.0 / 28, color="white", autoLog=False,
     )
 
-    pages = flow.load_instruction_pages(_TEXT_DIR)
+    pages = screens.load_instruction_pages(_TEXT_DIR)
     # pages: 0=intro, 1=valence, 2=arousal, 3=independence, 4=final
 
     # ── INSTRUCTIONS + PRACTICE DEMOS ────────────────────────────────────────
     if show_instructions:
-        flow.show_text_page(win, kb, instr_text, instr_hint, pages[0])
-        flow.show_text_page(win, kb, instr_text, instr_hint, pages[1])
-        flow.run_slider(win, kb, stim, "valence", cue=None)   # valence practice demo
-        flow.show_text_page(win, kb, instr_text, instr_hint, pages[2])
-        flow.run_slider(win, kb, stim, "arousal", cue=None)   # arousal practice demo
-        flow.show_text_page(win, kb, instr_text, instr_hint, pages[3])
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[0])
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[1])
+        screens.run_slider(win, kb, stim, "valence", cue=None)   # valence practice demo
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[2])
+        screens.run_slider(win, kb, stim, "arousal", cue=None)   # arousal practice demo
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[3])
 
     # Final "press 3 to select" page is always shown (MATLAB inst5).
-    flow.show_text_page(win, kb, instr_text, instr_hint, pages[4])
+    screens.show_text_page(win, kb, instr_text, instr_hint, pages[4])
 
     # ── RATING TRIALS ────────────────────────────────────────────────────────
-    flow.show_fixation(win, stim)
+    screens.show_fixation(win, stim)
     results: list[dict] = []
     for cue in rcore.RATING_CUES:
-        valence = flow.run_slider(win, kb, stim, "valence", cue)
-        arousal = flow.run_slider(win, kb, stim, "arousal", cue)
+        valence = screens.run_slider(win, kb, stim, "valence", cue)
+        arousal = screens.run_slider(win, kb, stim, "arousal", cue)
         results.append({
             "polarity": cue.polarity, "magnitude": cue.magnitude,
             "valence": valence, "arousal": arousal,
         })
-        flow.show_fixation(win, stim)
+        screens.show_fixation(win, stim)
 
     # ── WRITE CSV ────────────────────────────────────────────────────────────
     # (manifest.json was already written to run_dir at startup)
