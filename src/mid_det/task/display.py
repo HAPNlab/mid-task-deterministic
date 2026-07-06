@@ -105,9 +105,9 @@ def build_stimuli(win: visual.Window) -> Stimuli:
         height=font_h, wrapWidth=wrap_w, color=text_col,
         autoLog=False,
     )
-    keys_map = config.KEYS_BEHAVIORAL  # updated per session in update_instr_keys
     instr_first = visual.TextStim(
-        win, name="instr_first", text=f"Press {keys_map['forward']} to continue.",
+        win, name="instr_first",
+        text=f"Press {config.INSTRUCTION_KEYS['forward'][0]} to continue.",
         height=font_h, color=text_col, pos=(0, -y_scr / 4),
         autoLog=False,
     )
@@ -149,12 +149,6 @@ def build_stimuli(win: visual.Window) -> Stimuli:
         wait=wait,
         end=end,
     )
-
-
-def update_instr_keys(stimuli: Stimuli, fmri: bool) -> None:
-    """Update instruction navigation key labels based on run mode."""
-    keys_map = config.KEYS_FMRI if fmri else config.KEYS_BEHAVIORAL
-    stimuli.instr_first.text = f"Press {keys_map['forward']} to continue."
 
 
 def draw_cue(stimuli: Stimuli, polarity: str, magnitude: int) -> None:

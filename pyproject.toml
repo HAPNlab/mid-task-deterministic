@@ -7,9 +7,19 @@ name = "mid-task-deterministic"
 version = "1.0.0-rc.2"
 description = "Deterministic Monetary Incentive Delay Task - PsychoPy implementation for fMRI (no adaptive staircase)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 authors = [{ name = "Eric Wang" }]
 dependencies = [
+    # Shared experiment harness (screen/frame-timing, run dirs, manifests, CSV
+    # writers, setup-wizard primitives, instruction pager, keyboard abstraction).
+    # Published PyPI package; the exact version is pinned in uv.lock for
+    # reproducible clones and the run manifest also records psyexp_core_version.
+    # pip/conda resolve it too (production uses conda — see AGENTS.md). For
+    # co-development, overlay an editable sibling checkout and run with --no-sync
+    # (any uv sync reverts it — --inexact does NOT help; the core is in the lock):
+    #   uv pip install -e ../psyexp-core
+    #   uv run --no-sync ...        # or: export UV_NO_SYNC=1  (see `just core-*`)
+    "psyexp-core>=0.8.0",
     "psychopy>=2026.1",
     "scipy>=1.11",
     "numpy>=1.26",

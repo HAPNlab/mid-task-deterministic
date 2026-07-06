@@ -18,107 +18,41 @@ from psychopy import core
 
 core.checkPygletDuringWait = False
 
-from psychopy import prefs
-
-prefs.hardware["keyboardBackend"] = "ptb"
-
 from psychopy import visual
-from psychopy.hardware import keyboard
+from psyexp_core import rundir, screen
+from psyexp_core.keyboard import (
+    KEYBOARD_BACKEND,
+    build_keyboard,
+    configure_psychopy_backend,
+    wait_for_key,
+)
 from rich.console import Console
 
-from mid_det.io import bootstrap, recording
+from mid_det import config
+from mid_det.io import recording
 from mid_det.ratings import core as rcore
 from mid_det.ratings import display as rdisplay
+from mid_det.ratings import screens
 from mid_det.ratings.setup_wizard import run_ratings_wizard
 
 _PACKAGE_DIR = Path(__file__).resolve().parent          # src/mid_det/ratings/
 _PROJECT_ROOT = _PACKAGE_DIR.parent.parent.parent        # project root
 _TEXT_DIR = _PROJECT_ROOT / "text"
 
-# Slider control keys (MATLAB parity): 1 = left, 2 = right, 3 = select/advance.
-_KEY_LEFT = "1"
-_KEY_RIGHT = "2"
-_KEY_SELECT = "3"
-_ADVANCE_KEYS = [_KEY_LEFT, _KEY_RIGHT, _KEY_SELECT]
-# Instruction/text pages advance on button 1 only (forward-only, no going back).
-_PAGE_ADVANCE_KEYS = [_KEY_LEFT]
-_QUIT_KEYS = ["escape"]
-
-
-def _load_instruction_pages() -> list[str]:
-    path = _TEXT_DIR / "instructions_ratings.txt"
-    pages: list[str] = []
-    with open(path) as f:
-        for line in f:
-            stripped = line.rstrip()
-            if stripped:
-                pages.append(stripped)
-    return pages
-
-
-def _wait_keys(kb: keyboard.Keyboard, key_list: list[str]):
-    """Block until one of *key_list* (or escape) is pressed; return the name.
-    Escape quits the survey."""
-    kb.clearEvents()
-    while True:
-        pressed = kb.getKeys(keyList=key_list + _QUIT_KEYS, waitRelease=False)
-        if pressed:
-            name = pressed[0].name
-            if name in _QUIT_KEYS:
-                core.quit()
-            return name
-
-
-def _show_text_page(
-    win: visual.Window,
-    kb: keyboard.Keyboard,
-    text_stim: visual.TextStim,
-    hint_stim: visual.TextStim,
-    text: str,
-) -> None:
-    text_stim.text = text
-    text_stim.draw()
-    hint_stim.draw()
-    win.flip()
-    _wait_keys(kb, _PAGE_ADVANCE_KEYS)
-
-
-def _run_slider(
-    win: visual.Window,
-    kb: keyboard.Keyboard,
-    stim: rdisplay.RatingStimuli,
-    scale: str,
-    cue: rcore.RatingCue | None,
-) -> int:
-    """Run one slider interaction; return the selected position (1..N_ELS)."""
-    pos = rcore.START_SLIDEPOS[scale]
-    rdisplay.draw_scale(stim, scale, pos, cue)
-    win.flip()
-    while True:
-        key = _wait_keys(kb, _ADVANCE_KEYS)
-        if key == _KEY_LEFT:
-            pos = rcore.clamp_slider(pos, -1)
-        elif key == _KEY_RIGHT:
-            pos = rcore.clamp_slider(pos, +1)
-        elif key == _KEY_SELECT:
-            return pos
-        rdisplay.draw_scale(stim, scale, pos, cue)
-        win.flip()
-
-
-def _show_fixation(win: visual.Window, stim: rdisplay.RatingStimuli) -> None:
-    rdisplay.draw_fixation(stim)
-    win.flip()
-    core.wait(0.5)
-
 
 def run() -> None:
+    # Select the keyboard backend before any Keyboard is built.
+    configure_psychopy_backend()
+
     # ── SCREEN ───────────────────────────────────────────────────────────────
-    win_res, win, screen_diag = bootstrap.setup_screen()
+    # Let the operator pick the display (auto-returns 0 when there's only one);
+    # the chosen monitor is captured in screen_diag and recorded in the manifest.
+    screen_index = screen.prompt_screen()
+    win_res, win, screen_diag = screen.setup_screen(screen=screen_index)
 
     # ── WIZARD ───────────────────────────────────────────────────────────────
     subject_id, show_instructions, legacy_name = run_ratings_wizard()
-    session_time = datetime.now()
+    session_started_at = datetime.now()
 
     rcon = Console(stderr=True)
     rcon.print(f"[bold]Cue-ratings survey:[/bold] subject=[cyan]{subject_id}[/cyan]")
@@ -126,14 +60,14 @@ def run() -> None:
     # ── RUN DIR + MANIFEST ───────────────────────────────────────────────────
     # Write the manifest up front (mirroring the MID task) so session metadata is
     # captured even if the survey is aborted before the CSV is written at the end.
-    ts = session_time.strftime("%Y%m%dT%H%M%S")
-    run_dir = _PROJECT_ROOT / "data" / f"{subject_id}_ratings_{ts}"
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = rundir.make_run_dir(
+        _PROJECT_ROOT / "data", f"{subject_id}_ratings", session_started_at
+    )
     recording.write_ratings_manifest(
         run_dir=run_dir,
         subject_id=subject_id,
         show_instructions=show_instructions,
-        session_time=session_time,
+        session_started_at=session_started_at,
         screen_diag=screen_diag,
         win_res=win_res,
         n_cues=len(rcore.RATING_CUES),
@@ -141,15 +75,13 @@ def run() -> None:
     )
 
     # ── KEYBOARD ─────────────────────────────────────────────────────────────
-    kb = keyboard.Keyboard()
-    actual_backend = kb.device.getBackend()
-    if actual_backend != "ptb":
+    if KEYBOARD_BACKEND != "ptb":
         win.close()
         raise RuntimeError(
-            f"Keyboard backend is '{actual_backend}', not 'ptb'. "
+            f"Keyboard backend is '{KEYBOARD_BACKEND}', not 'ptb'. "
             "Install psychtoolbox: pip install psychtoolbox"
         )
-    kb.device.muteOutsidePsychopy = False
+    kb = build_keyboard()
     win.mouseVisible = False
 
     # ── STIMULI ──────────────────────────────────────────────────────────────
@@ -165,32 +97,32 @@ def run() -> None:
         pos=(0, -0.38), height=1.0 / 28, color="white", autoLog=False,
     )
 
-    pages = _load_instruction_pages()
+    pages = screens.load_instruction_pages(_TEXT_DIR)
     # pages: 0=intro, 1=valence, 2=arousal, 3=independence, 4=final
 
     # ── INSTRUCTIONS + PRACTICE DEMOS ────────────────────────────────────────
     if show_instructions:
-        _show_text_page(win, kb, instr_text, instr_hint, pages[0])
-        _show_text_page(win, kb, instr_text, instr_hint, pages[1])
-        _run_slider(win, kb, stim, "valence", cue=None)   # valence practice demo
-        _show_text_page(win, kb, instr_text, instr_hint, pages[2])
-        _run_slider(win, kb, stim, "arousal", cue=None)   # arousal practice demo
-        _show_text_page(win, kb, instr_text, instr_hint, pages[3])
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[0])
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[1])
+        screens.run_slider(win, kb, stim, "valence", cue=None)   # valence practice demo
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[2])
+        screens.run_slider(win, kb, stim, "arousal", cue=None)   # arousal practice demo
+        screens.show_text_page(win, kb, instr_text, instr_hint, pages[3])
 
     # Final "press 3 to select" page is always shown (MATLAB inst5).
-    _show_text_page(win, kb, instr_text, instr_hint, pages[4])
+    screens.show_text_page(win, kb, instr_text, instr_hint, pages[4])
 
     # ── RATING TRIALS ────────────────────────────────────────────────────────
-    _show_fixation(win, stim)
+    screens.show_fixation(win, stim)
     results: list[dict] = []
     for cue in rcore.RATING_CUES:
-        valence = _run_slider(win, kb, stim, "valence", cue)
-        arousal = _run_slider(win, kb, stim, "arousal", cue)
+        valence = screens.run_slider(win, kb, stim, "valence", cue)
+        arousal = screens.run_slider(win, kb, stim, "arousal", cue)
         results.append({
             "polarity": cue.polarity, "magnitude": cue.magnitude,
             "valence": valence, "arousal": arousal,
         })
-        _show_fixation(win, stim)
+        screens.show_fixation(win, stim)
 
     # ── WRITE CSV ────────────────────────────────────────────────────────────
     # (manifest.json was already written to run_dir at startup)
@@ -218,7 +150,11 @@ def run() -> None:
     )
     end.draw()
     win.flip()
-    core.wait(1.5)
+
+    rcon.print("[bold green]Run complete[/bold green]")
+    exit_key = config.END_KEYS[0]
+    rcon.print(f"[bold yellow]Press '{exit_key}' to exit...[/bold yellow]")
+    wait_for_key(kb, config.END_KEYS, quit_keys=config.QUIT_KEYS)
 
     win.close()
     core.quit()

@@ -61,6 +61,47 @@ pip install -e ".[dev]"
 `uv.lock`) are ignored by pip/conda, so the conda install resolves dependencies fresh from PyPI
 rather than from the lockfile.
 
+## Updating `psyexp-core`
+
+The shared experiment harness lives in the published [`psyexp-core`](https://github.com/HAPNlab/psyexp-core)
+package, declared as `psyexp-core>=X.Y` in `pyproject.toml` with the exact version pinned in
+`uv.lock`. A bare `uv sync` does **not** pull a newer release — it installs exactly what `uv.lock`
+pins, so a newly published version is ignored until the lock is regenerated. To upgrade:
+
+```bash
+uv lock --upgrade-package psyexp-core   # rewrite uv.lock to the newest version the constraint allows
+uv sync                                 # apply it
+```
+
+Then commit the updated `uv.lock`. Raise the `>=` floor in `pyproject.toml` first if you want to
+require a new minimum. (`just core-upgrade` runs both commands.)
+
+## Co-developing `psyexp-core` locally
+
+To work on the harness from a sibling checkout, overlay an editable install. The catch: `uv.lock`
+is authoritative, so **any `uv sync` reverts the overlay** back to the locked PyPI version.
+`--inexact` does *not* help — it only retains packages absent from the lock, and the core is in it.
+The only thing that preserves the overlay is skipping the sync entirely:
+
+```bash
+uv pip install -e ../psyexp-core    # one time
+uv run --no-sync mid-task-det       # or: export UV_NO_SYNC=1 for the shell
+```
+
+The `just` recipes wrap this workflow:
+
+```bash
+just core-dev        # overlay the editable ../psyexp-core
+just core-run        # run the task with --no-sync (overlay preserved)
+just core-test       # run pytest with --no-sync
+just core-release    # drop the overlay, restore the locked PyPI core (plain uv sync)
+```
+
+Don't run a bare `uv sync`/`uv run` while overlaying — it silently reverts the editable core. For a
+setup that survives sync, declare the path source in `pyproject.toml`
+(`[tool.uv.sources] psyexp-core = { path = "../psyexp-core", editable = true }`) and keep that edit
+local with `git update-index --skip-worktree pyproject.toml uv.lock` so it never lands in a commit.
+
 ## Project Structure
 
 ```
@@ -97,7 +138,7 @@ mid-task-deterministic/
 │   ├── run_2.csv             # 54-trial sequence for run 2
 │   └── practice.csv          # 18-trial practice (one trial per condition)
 ├── text/
-│   └── instructions_MID.txt  # Instruction pages (one line per page)
+│   └── instructions_ratings.txt  # Cue-ratings instructions (MID task pages are hardcoded in task/instructions.py)
 ├── data/                     # Output directory (created at runtime)
 ├── tests/
 ├── docs/

@@ -2,26 +2,26 @@
 Interactive terminal setup wizard for the MID task.
 
 Replaces the PsychoPy gui.DlgFromDict dialog with a questionary/prompt_toolkit
-wizard that:
-  - Provides select lists where appropriate (task number)
-  - Defaults RT fields to frame-aligned values
-  - Lets operators step RT values with ↑/↓ arrows (±1 frame each press)
-  - Shows a live "≈ X frames" bottom-toolbar so any entered value is grounded
-    in display timing
+wizard built on the shared psyexp_core.wizard primitives (styles, ask_* helpers,
+the overwrite-guarded filename prompt, and quit handling). The MID-specific bits
+stay here: a frame-stepping RT prompt that
+
+  - defaults RT fields to frame-aligned values,
+  - lets operators step RT values with ↑/↓ arrows (±1 frame each press), and
+  - shows a live "≈ X frames" bottom-toolbar so any entered value is grounded
+    in display timing.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
-from typing import NoReturn
 
 import questionary
 from prompt_toolkit import prompt as _pt_prompt
 from prompt_toolkit.application.current import get_app
 from prompt_toolkit.formatted_text import HTML, FormattedText
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.styles import Style as PtStyle
 from prompt_toolkit.validation import ValidationError, Validator
+from psyexp_core import wizard
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
@@ -32,36 +32,9 @@ from mid_det.io.bootstrap import SessionInfo
 
 _rcon = Console(stderr=True)
 
-# ── Styles ────────────────────────────────────────────────────────────────────
-
 # Placeholder subject ID — shown greyed-out and used as the fallback when the
 # field is left empty (handy for testing).
 _SUBJECT_PLACEHOLDER = "XXX000"
-
-# Match questionary's default palette so everything looks cohesive.
-_QSTYLE = questionary.Style(
-    [
-        ("qmark", "fg:#5f819d bold"),
-        ("question", "bold"),
-        ("answer", "fg:#ff9d00 bold"),
-        ("pointer", "fg:#ff9d00 bold"),
-        ("highlighted", "fg:#ff9d00 bold"),
-        ("selected", "fg:#cc5454"),
-        ("separator", "fg:#6c6c6c"),
-        ("instruction", "fg:#858585 italic"),
-        ("placeholder", "fg:#6c6c6c"),
-    ]
-)
-
-# prompt_toolkit style for the custom RT prompts
-_PT_STYLE = PtStyle.from_dict(
-    {
-        "prompt": "#ff9d00 bold",           # ❯ arrow: matches questionary answer
-        "placeholder": "#6c6c6c italic",    # greyed-out example, not submitted
-        "bottom-toolbar": "bg:#1e1e1e #888888",
-        "bottom-toolbar.text": "bg:#1e1e1e",
-    }
-)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,88 +50,7 @@ def _nearest_frame_aligned(value_ms: float, frame_dur_ms: float) -> float:
     return round(round(value_ms / frame_dur_ms) * frame_dur_ms, 2)
 
 
-def _quit() -> NoReturn:
-    from psychopy import core  # late import — avoids circular / slow startup
-    core.quit()
-    raise SystemExit(0)  # unreachable; tells the type checker this never returns
-
-
-def prompt_legacy_name(legacy_dir: Path, filename_for: Callable[[str], str]) -> str:
-    """Prompt for the legacy-format file's NAME and guard against clobbering an
-    existing file (the legacy names aren't timestamped, so same subject/run can
-    collide). *filename_for* maps the entered NAME to the target filename.
-
-    Re-prompts until the resulting path is free or the operator confirms an
-    overwrite. Returns the chosen NAME.
-    """
-    # Print the label above the input field (the prompt itself is just "❯").
-    _rcon.print(
-        "[bold #5f819d]?[/bold #5f819d] [bold]Legacy filename[/bold]  "
-        "[dim]NAME is only part of the saved file[/dim]",
-        highlight=False,
-    )
-
-    # Bottom toolbar: live preview of the resolved path as NAME is typed.
-    def _toolbar():
-        typed = get_app().current_buffer.text.strip()
-        if not typed:
-            return FormattedText(
-                [("fg:ansired bold", " ✗  Name cannot be empty")]
-            )
-        preview = legacy_dir / filename_for(typed)
-        return FormattedText([("fg:ansigreen bold", f" → saves as {preview}")])
-
-    while True:
-        raw = ""
-        try:
-            raw = _pt_prompt(
-                FormattedText([("class:prompt", "❯ ")]),
-                placeholder=HTML("<placeholder>e.g. 1</placeholder>"),
-                bottom_toolbar=_toolbar,
-                style=_PT_STYLE,
-            )
-        except (KeyboardInterrupt, EOFError):
-            _quit()
-        name = raw.strip()
-        if not name:
-            _rcon.print("[red]Name cannot be empty.[/red]")
-            continue
-
-        target = legacy_dir / filename_for(name)
-        if not target.exists():
-            return name
-
-        overwrite: bool | None = questionary.confirm(
-            f"{target.name} already exists in {legacy_dir}/ — overwrite?",
-            default=False,
-            style=_QSTYLE,
-        ).ask()
-        if overwrite is None:
-            _quit()
-        if overwrite:
-            return name
-        # else: loop and re-prompt for a different NAME
-    # Unreachable: the loop only exits via `return` or `_quit()`. Present so the
-    # type checker can see every path returns `str` (not `str | None`).
-    raise AssertionError("prompt_legacy_name loop exited unexpectedly")
-
-
 # ── Custom RT field ───────────────────────────────────────────────────────────
-
-
-class _PosFloatValidator(Validator):
-    def validate(self, document):
-        text = document.text.strip()
-        try:
-            v = float(text)
-        except ValueError:
-            raise ValidationError(
-                message="Enter a number (ms)", cursor_position=len(text)
-            )
-        if v <= 0:
-            raise ValidationError(
-                message="Value must be > 0 ms", cursor_position=len(text)
-            )
 
 
 class _RTMaxValidator(Validator):
@@ -273,7 +165,7 @@ def _rt_prompt(
             jitter_max_ms=jitter_max_ms if jitter_max_ms is not None else 0.0,
         )
     else:
-        validator = _PosFloatValidator()
+        validator = wizard.PosFloatValidator(unit="ms")
 
     try:
         raw = _pt_prompt(
@@ -283,10 +175,10 @@ def _rt_prompt(
             bottom_toolbar=_toolbar,
             validator=validator,
             validate_while_typing=False,
-            style=_PT_STYLE,
+            style=wizard.PT_STYLE,
         )
     except (KeyboardInterrupt, EOFError):
-        _quit()
+        wizard.quit_app()
     return float(raw)
 
 
@@ -321,42 +213,24 @@ def run_wizard(frame_dur_s: float) -> SessionInfo:
     # Placeholder (not a default): shown greyed-out so production users type the
     # real ID without having to clear the default value. Pressing Enter on an
     # empty field falls back to the placeholder value — convenient for testing.
-    subject_id: str | None = questionary.text(
-        "Subject ID",
-        placeholder=HTML(f"<placeholder>{_SUBJECT_PLACEHOLDER}</placeholder>"),
-        style=_QSTYLE,
-    ).ask()
-    if subject_id is None:
-        _quit()
-    subject_id_str: str = subject_id.strip() or _SUBJECT_PLACEHOLDER
+    subject_id = wizard.ask_text("Subject ID", placeholder=_SUBJECT_PLACEHOLDER)
+    subject_id_str = subject_id.strip() or _SUBJECT_PLACEHOLDER
 
-    run_n: str | None = questionary.select(
+    run_n: str = wizard.ask_select(
         "Task",
         choices=[
             questionary.Choice("Practice run", value="practice"),
             questionary.Choice("Run 1", value="1"),
             questionary.Choice("Run 2", value="2"),
         ],
-        style=_QSTYLE,
-    ).ask()
-    if run_n is None:
-        _quit()
-    run_n: str = run_n
+    )
 
-    fmri: bool | None = questionary.confirm(
-        "fMRI session?", default=False, style=_QSTYLE
-    ).ask()
-    if fmri is None:
-        _quit()
-
-    show_instructions: bool | None = questionary.confirm(
-        "Show instructions?", default=True, style=_QSTYLE
-    ).ask()
-    if show_instructions is None:
-        _quit()
+    fmri = wizard.ask_confirm("fMRI session?", default=False)
+    show_instructions = wizard.ask_confirm("Show instructions?", default=True)
 
     # ── Legacy-format filename ────────────────────────────────────────────────
-    legacy_name = prompt_legacy_name(
+    legacy_name = wizard.prompt_unique_name(
+        "Legacy filename",
         Path("data") / "legacy-fmt",
         lambda n: f"{n}_b{run_n}.csv",
     )

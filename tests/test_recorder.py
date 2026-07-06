@@ -50,6 +50,7 @@ class _FakeScreenDiag:
     calib_p99_ms: float = 17.0
     calib_max_ms: float = 18.0
     calib_n: int = 120
+    monitor: dict | None = None
 
 
 def test_ratings_manifest_written(tmp_path: Path):
@@ -57,7 +58,7 @@ def test_ratings_manifest_written(tmp_path: Path):
         run_dir=tmp_path,
         subject_id="S1",
         show_instructions=True,
-        session_time=datetime(2026, 6, 2, 14, 30, 0),
+        session_started_at=datetime(2026, 6, 2, 14, 30, 0),
         screen_diag=_FakeScreenDiag(),
         win_res=[1920, 1080],
         n_cues=6,

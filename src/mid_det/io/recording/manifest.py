@@ -1,89 +1,28 @@
 """
-Run manifest writers (manifest.json) plus the best-effort system/hardware
-diagnostics they embed: write_manifest for a task run, write_ratings_manifest for
-a cue-ratings survey run.
+Run manifest writers (manifest.json): write_manifest for a task run,
+write_ratings_manifest for a cue-ratings survey run. Both delegate to the shared
+``psyexp_core.manifest.write_manifest``, which fills in the system / display /
+process diagnostics and the resolved psyexp_core_version; this module supplies
+the MID-specific top-level fields (via *header*) and parameters (*study_params*).
 """
 from __future__ import annotations
 
-import json
-import platform
-import socket
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from psyexp_core.manifest import write_manifest as _core_write_manifest
+
 if TYPE_CHECKING:
-    from mid_det.io.bootstrap import ScreenDiagnostics, SessionInfo
+    from psyexp_core.diagnostics import ScreenDiagnostics
 
-
-def _git_commit() -> str:
-    try:
-        out = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=Path(__file__).resolve().parent,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-        return out.strip()
-    except Exception:  # noqa: BLE001 — diagnostic only
-        return "unknown"
-
-
-def _cpu_name() -> str:
-    """Best-effort friendly CPU name.
-
-    ``platform.processor()`` returns the raw CPUID descriptor on Windows
-    (e.g. "Intel64 Family 6 Model 158 Stepping 11") and the bare arch on
-    macOS, neither of which is a marketing name. Read the registry on
-    Windows; otherwise fall back to ``platform.processor()``.
-    """
-    if platform.system() == "Windows":
-        try:
-            import winreg
-
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"HARDWARE\DESCRIPTION\System\CentralProcessor\0",
-            )
-            try:
-                name, _ = winreg.QueryValueEx(key, "ProcessorNameString")
-            finally:
-                winreg.CloseKey(key)
-            if name:
-                return str(name).strip()
-        except Exception:  # noqa: BLE001 — diagnostic only
-            pass
-    return platform.processor() or "unknown"
-
-
-def _psychopy_version() -> str:
-    try:
-        import psychopy  # type: ignore
-        return getattr(psychopy, "__version__", "unknown")
-    except Exception:  # noqa: BLE001
-        return "unknown"
-
-
-def _system_info() -> dict:
-    return {
-        "hostname": socket.gethostname(),
-        "platform": platform.platform(),
-        "machine": platform.machine(),
-        "processor": _cpu_name(),
-        "os_name": platform.system(),
-        "os_release": platform.release(),
-        "python_version": platform.python_version(),
-        "psychopy_version": _psychopy_version(),
-        "git_commit": _git_commit(),
-    }
+    from mid_det.io.bootstrap import SessionInfo
 
 
 def write_manifest(
     run_dir: Path,
     session_info: "SessionInfo",
-    session_time: datetime,
+    session_started_at: datetime,
     frame_rate: float,
     n_trials: int,
     screen_diag: "ScreenDiagnostics",
@@ -94,65 +33,53 @@ def write_manifest(
 ) -> None:
     from mid_det import __version__
     from mid_det.config import (
-        MR_SETTINGS,
-        INITIAL_FIX_DUR_S,
         CLOSING_FIX_DUR_S,
-        WIN_RATIO_THRESHOLD,
-        MIN_TRIALS_FOR_ADAPT,
-        JITTER_MIN_S,
+        INITIAL_FIX_DUR_S,
         JITTER_MAX_S,
+        JITTER_MIN_S,
+        MIN_TRIALS_FOR_ADAPT,
+        MR_SETTINGS,
+        WIN_RATIO_THRESHOLD,
     )
 
-    manifest = {
+    header = {
         "mid_task_deterministic_version": __version__,
         "subject_id": session_info.subject_id,
         "run_n": session_info.run_n,
         "fmri": session_info.fmri,
         "show_instructions": session_info.show_instructions,
-        "session_time": session_time.isoformat(timespec="seconds"),
-        "frame_rate_hz": round(frame_rate, 3),
-        "n_trials": n_trials,
-        "study_params": {
-            "tr_duration_s": MR_SETTINGS["TR"],
-            "initial_fix_dur_s": INITIAL_FIX_DUR_S,
-            "closing_fix_dur_s": CLOSING_FIX_DUR_S,
-            "base_rt_s": session_info.base_rt_s,
-            "rt_change_s": session_info.rt_change_s,
-            "win_ratio_threshold": WIN_RATIO_THRESHOLD,
-            "min_trials_for_adapt": MIN_TRIALS_FOR_ADAPT,
-            "jitter_min_s": JITTER_MIN_S,
-            "jitter_max_s": JITTER_MAX_S,
-        },
-        "system": _system_info(),
-        "display": {
-            "gl_vendor": screen_diag.gl_vendor,
-            "gl_renderer": screen_diag.gl_renderer,
-            "win_type": screen_diag.win_type,
-            "pyglet_version": screen_diag.pyglet_version,
-            "resolution": list(win_res),
-            "frame_dur_ms": round(frame_dur_s * 1000, 4),
-            "frame_dur_source": frame_dur_source,
-            "vsync_calibration": {
-                "median_ms": screen_diag.calib_median_ms,
-                "p99_ms": screen_diag.calib_p99_ms,
-                "max_ms": screen_diag.calib_max_ms,
-                "n_samples": screen_diag.calib_n,
-            },
-        },
-        "process": {
-            "priority_raised": priority_raised,
-            "argv": sys.argv,
-        },
     }
-    with open(run_dir / "manifest.json", "w") as f:
-        json.dump(manifest, f, indent=2)
+    study_params = {
+        "tr_duration_s": MR_SETTINGS["TR"],
+        "initial_fix_dur_s": INITIAL_FIX_DUR_S,
+        "closing_fix_dur_s": CLOSING_FIX_DUR_S,
+        "base_rt_s": session_info.base_rt_s,
+        "rt_change_s": session_info.rt_change_s,
+        "win_ratio_threshold": WIN_RATIO_THRESHOLD,
+        "min_trials_for_adapt": MIN_TRIALS_FOR_ADAPT,
+        "jitter_min_s": JITTER_MIN_S,
+        "jitter_max_s": JITTER_MAX_S,
+    }
+    _core_write_manifest(
+        run_dir,
+        header=header,
+        session_started_at=session_started_at,
+        screen_diag=screen_diag,
+        win_res=win_res,
+        study_params=study_params,
+        frame_rate=frame_rate,
+        n_trials=n_trials,
+        frame_dur_s=frame_dur_s,
+        frame_dur_source=frame_dur_source,
+        extra_process={"priority_raised": priority_raised},
+    )
 
 
 def write_ratings_manifest(
     run_dir: Path,
     subject_id: str,
     show_instructions: bool,
-    session_time: datetime,
+    session_started_at: datetime,
     screen_diag: "ScreenDiagnostics",
     win_res: list[int],
     n_cues: int,
@@ -160,28 +87,23 @@ def write_ratings_manifest(
 ) -> None:
     """Write manifest.json for a cue-ratings survey run.
 
-    The survey is self-paced (no scanner sync / frame-timing), so this is a
-    trimmed version of write_manifest — no study_params or frame-rate fields.
+    The survey is self-paced (no scanner sync / frame-timing), so this passes no
+    study_params or frame-rate fields — just the survey header and display block.
     """
     from mid_det import __version__
 
-    manifest = {
+    header = {
         "mid_task_deterministic_version": __version__,
         "task": "cue-ratings",
         "subject_id": subject_id,
         "show_instructions": show_instructions,
-        "session_time": session_time.isoformat(timespec="seconds"),
         "n_cues": n_cues,
         "scale_points": scale_points,
-        "system": _system_info(),
-        "display": {
-            "gl_vendor": screen_diag.gl_vendor,
-            "gl_renderer": screen_diag.gl_renderer,
-            "win_type": screen_diag.win_type,
-            "pyglet_version": screen_diag.pyglet_version,
-            "resolution": [int(x) for x in win_res],
-        },
-        "process": {"argv": sys.argv},
     }
-    with open(run_dir / "manifest.json", "w") as f:
-        json.dump(manifest, f, indent=2)
+    _core_write_manifest(
+        run_dir,
+        header=header,
+        session_started_at=session_started_at,
+        screen_diag=screen_diag,
+        win_res=win_res,
+    )

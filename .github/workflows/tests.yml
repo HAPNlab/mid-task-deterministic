@@ -8,7 +8,7 @@ jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Octave is the reference engine for the calibration MATLAB-parity test
       # (tests/test_calibration_matlab_parity.py). Without it that test skips
@@ -21,18 +21,29 @@ jobs:
           octave --version | head -1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       # PsychoPy is deliberately NOT installed: it's a heavy GUI/audio dep whose
       # transitive build (ffpyplayer → SDL headers) is fragile on headless CI.
       # The source modules guard their psychopy imports (try/except), so the
-      # whole test suite imports and runs without it; only pandas is needed at
-      # runtime (sequences.py). We install just that + pytest and put `src` on
-      # PYTHONPATH rather than resolving the project's full dependency graph.
+      # whole test suite imports and runs without it; pandas (sequences.py) and
+      # pydantic (psyexp-core's manifest models, since core 0.7.0) are needed at
+      # runtime. We install just those + pytest and put `src` on PYTHONPATH
+      # rather than resolving the project's full dependency graph.
+      #
+      # psyexp-core is installed --no-deps for the same reason: the light modules
+      # the tests pull in (recording / manifest / rundir / diagnostics / keyboard)
+      # are import-clean without PsychoPy, so --no-deps avoids dragging the GUI
+      # stack back in (pydantic, installed above, is its one non-GUI runtime dep
+      # the tests touch). Its pinned version is read from uv.lock via `uv export`
+      # rather than hardcoding it here — the lockfile stays the single source of
+      # truth.
       - name: Create venv and install minimal test deps
         run: |
           uv venv
-          uv pip install pytest pandas
+          uv pip install pytest pandas pydantic
+          uv export --frozen --no-hashes --no-emit-project | grep '^psyexp-core==' > psyexp-core-req.txt
+          uv pip install --no-deps -r psyexp-core-req.txt
 
       # tests/test_overlay.py is excluded: it's not an automated test (no test
       # functions) but a manual `visual.Window` script that needs a live display
