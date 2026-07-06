@@ -12,21 +12,6 @@ would copy belongs in `psyexp-core`.**
 
 ---
 
-## Open: align heat-task on the core manifest API
-
-`psyexp-core` renamed `write_manifest(session_time=…)` →
-`write_manifest(session_started_at=…)` in **0.8.0**. mid-task moved to 0.8.0 and
-the new kwarg; **heat-task is still on 0.7.0 and still passes `session_time=`**.
-So the two repos are pinned to different core majors and call the manifest writer
-differently.
-
-**Action:** bump heat-task to `psyexp-core>=0.8.0` and rename its `write_manifest`
-call's kwarg to `session_started_at`; then bump to `0.9.0` and replace its
-`task/phases.py` `wait_for_key`/`check_quit` with the core ones (mid-task already
-does this). Keep the per-run `psyexp_core_version` in every manifest so the
-resolved core is always recoverable. Treat the core's public signature as a shared
-contract: a rename is a coordinated bump across all task repos in the same batch.
-
 ## Deferred: candidate core extractions
 
 Worth centralizing eventually, but not until a second consumer makes the dedup pay
