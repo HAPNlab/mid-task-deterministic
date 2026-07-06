@@ -930,7 +930,7 @@ wheels = [
 
 [[package]]
 name = "psyexp-core"
-version = "0.8.0"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -944,9 +944,9 @@ dependencies = [
     { name = "questionary" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/26/8880f7e0275ad5462c521f30d7d478e32f5d6896133554646014f27b006d/psyexp_core-0.8.0.tar.gz", hash = "sha256:bf6a27a3d632c2eca564e257435ed0a173bf6c8a5c204225b3d59fd0d030b0eb", size = 136762, upload-time = "2026-06-29T18:35:02.511Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/1b/50431d9fbb725aa2f85e4948612e588188855035f1b79542f4ef6cc0e85c/psyexp_core-0.9.0.tar.gz", hash = "sha256:215fb7309541d9e13a0b6e3398a44b2b13276e7791dc38c7dd314aaf7d87e561", size = 138067, upload-time = "2026-07-06T19:19:47.121Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/57/32/6d68358389da5985aaaea2a59b37ca8ed4440a7faf1de7819f3c1888b3a1/psyexp_core-0.8.0-py3-none-any.whl", hash = "sha256:335fb6094486433dd399ec854e7e81ec93b2436498bfe58a0a3f5a539b0376b5", size = 24544, upload-time = "2026-06-29T18:35:01.1Z" },
+    { url = "https://files.pythonhosted.org/packages/96/6c/56061abc8cbb10d2272cca1c46664f466c25950cab872b66cfe8e0070fc9/psyexp_core-0.9.0-py3-none-any.whl", hash = "sha256:5e6ed07bd4d7a0b8142d9fe0d6d2c7d9e73dcc7e293cf082243cb6e37c8bedb8", size = 25199, upload-time = "2026-07-06T19:19:45.934Z" },
 ]
 
 [[package]]
