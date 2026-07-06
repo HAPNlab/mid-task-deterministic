@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-rc.3
+
+### Added
+
+- Operator prompt to select the display at launch, recording the chosen monitor.
+- Hardcoded MID instruction pages with example-cue visual aids.
+
+### Changed
+
+- **Breaking:** renamed the `session_time` field to `session_started_at`.
+- Consume `psyexp-core` (0.7.0) from PyPI for shared experiment infrastructure,
+  including standardized keymaps and keyboard helpers.
+- Guarantee resource teardown via `ExitStack` in the task entry points.
+- Reorganized the ratings screen-flow helpers into a dedicated `screens` module.
+- Capped Python compatibility to match PsychoPy.
+
 ## v1.0.0-rc.2
 
 ### Added
