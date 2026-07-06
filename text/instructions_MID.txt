@@ -1,4 +1,0 @@
-In this experiment you will respond as quickly as possible to earn money. You will see a cue indicating how much money you can win or avoid losing. After this cue, a triangle will appear. Hit a button as fast as you can when the triangle appears to win. Press any button to continue the instructions.
-Cues are either circles or squares. CIRCLE cues mean that you can EARN that amount if you hit the target. SQUARE cues mean that you can AVOID LOSING that amount if you hit the target. Press any button to continue the instructions.
-If you miss a CIRCLE cue, you will NOT GAIN the amount in the cue. If you miss a SQUARE cue, you will LOSE the amount in the cue. Press any button to continue the instructions.
-Please HOLD STILL while you are in the scanner. 

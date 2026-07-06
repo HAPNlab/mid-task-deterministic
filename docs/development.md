@@ -138,7 +138,7 @@ mid-task-deterministic/
 │   ├── run_2.csv             # 54-trial sequence for run 2
 │   └── practice.csv          # 18-trial practice (one trial per condition)
 ├── text/
-│   └── instructions_MID.txt  # Instruction pages (one line per page)
+│   └── instructions_ratings.txt  # Cue-ratings instructions (MID task pages are hardcoded in task/instructions.py)
 ├── data/                     # Output directory (created at runtime)
 ├── tests/
 ├── docs/
